@@ -225,19 +225,22 @@ class global_data(object):
          work information"""
       return self.__work_list__.values()
 
-def lease_monitor(msg_list, max_lease_time, broker_connection):
+def lease_monitor(msg_list, max_lease_time, interval, broker_connection):
    """Monitor all work for lease expiration.  If a lease expired, the work
       is released"""
    while True:
+#      print "Checking leases " + str(time.time())
       expire_time = float(time.time())
       for item in msg_list.values():
+#         print "access time = " + str(item.access_time)
+#         print "expire time = " + str(expire_time)
          if (float(item.access_time) + float(max_lease_time)) < expire_time:
             # The lease for this message has expired, so delete it from the
             # list of known messages and release the lock
 #            print "Expiring " + item.AMQP_msg.content['message_id']
             msg_list.remove_work(item.AMQP_msg.content['message_id'])
             broker_connection.message_release([item.AMQP_msg.command_id, item.AMQP_msg.command_id])
-      time.sleep(1)
+      time.sleep(int(interval))
 
 def grep(pattern, data):
    """Returns the first instance found of pattern in data.  If pattern
@@ -410,6 +413,9 @@ def handle_prepare_job(req_socket, reply, known_items):
       # in the exit message.  This is bad and shouldn't happen.
       raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s" % message_id)
    else:
+      # Update the access time so the job isn't expired
+      saved_work.access_time = time.time()
+
       # Place the body of the message, which should contain an archived
       # file, into the directory for the job
       reply.data = ""
@@ -440,7 +446,7 @@ def handle_evict_claim(msg, known_items, broker_connection):
    if saved_work == Empty:
       # Couldn't find the AMQP message that corresponds to the AMQPID
       # in the exit message.  This is bad and shouldn't happen.
-      raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s.  Message cannot be acknowledged!" % message_id)
+      raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s." % message_id)
    else:
       # Place the data into the appropriate headers for the
       # results message.
@@ -467,6 +473,9 @@ def handle_update_job_status(msg, known_items, broker_connection):
       # in the exit message.  This is bad and shouldn't happen.
       raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s" % message_id)
    else:
+      # Update the access time so the job isn't expired
+      saved_work.access_time = time.time()
+
       # Place the data into the appropriate headers for the
       # results message.
       results = parse_data_into_AMQP_msg (msg.data)
@@ -516,11 +525,13 @@ def handle_exit(req_socket, msg, known_items, broker_connection, msg_headers):
          # in the exit message.  This is bad and shouldn't happen.
          raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s.  Message cannot be acknowledged!" % message_id)
       else:
-         ack_msg = saved_work.AMQP_msg
+         # Update the access time so the job isn't expired
+         saved_work.access_time = time.time()
 
          # If any files were specified to be retrieved via the 'result_files'
          # field, then create an archive of the files (if they exist) and
          # place it in the body of the results message
+         ack_msg = saved_work.AMQP_msg
          if ack_msg.content['application_headers'].has_key('result_files')  == True  and str(ack_msg.content['application_headers']['result_files']) != '':
             orig_cwd = os.getcwd()
             os.chdir(work_cwd)
@@ -602,7 +613,7 @@ def main(argv=None):
       work_queue = client.queue(dest)
 
       # Create a thread to monitor work expiration times
-      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, server['lease_time'], session))
+      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, server['lease_time'], server['lease_check_interval'], session))
       monitor_thread.setDaemon(True)
       monitor_thread.start()
 
