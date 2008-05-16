@@ -18,11 +18,6 @@ from qpid.client import Client
 from qpid.content import Content
 from qpid.queue import Empty
 
-#class exception_handler(Exception):
-#   def __init__(self, level, *msgs):
-#      self.level = level
-#      self.msgs = msgs
-
 class exit_signal(Exception):
    def __init__(self, str):
       self.msg = str
@@ -80,66 +75,169 @@ class threadsafe_dict(object):
       self.__unlock__()
       return value
 
-class threadsafe_list(object):
-   def __init__(self):
-      """Creates the default list and sets up the lock"""
-      self.__access_lock__ = threading.Lock()
-      self.__list__ = []
-
-   def __lock__(self):
-      """Acquires the lock"""
-      self.__access_lock__.acquire(True)
-
-   def __unlock__(self):
-      """Releases the lock"""
-      self.__access_lock__.release()
-
-   def add(self, value):
-      """Adds an entry to the list.  Raises an exception if the value
-         already exists in the list"""
-      if self.exists(value) == False:
-         self.__lock__()
-         self.__list__.append(value)
-         self.__unlock__()
-      else:
-         raise exception_handler(syslog.LOG_WARNING, "Value %s already exists in the list." % value)
-
-   def remove(self, value):
-      """Removes an entry from the list.  Returns Empty if the entry
-         doesn't exist in the list"""
-      pos = int(self.__find__(value))
-      if pos >= 0:
-         self.__lock__()
-         removed = self.__list__[pos]
-         del self.__list__[pos]
-         self.__unlock__()
-         return removed
-      else:
-         return Empty
-
-   def __find__(self, entry):
-      """Returns the postition of the desired entry in the list.
-         If the entry doesn't exist in the list, -1 is returned"""
-      value = -1
+   def items(self):
+      """Return the (key,value) pairs stored in the dictionary"""
       self.__lock__()
-      for pos in range(0,len(self.__list__)):
-         if entry == self.__list__[pos]:
-            value = pos
-            break
+      list = self.__list__.items()
       self.__unlock__()
-      return value
+      return list
 
-   def exists(self,entry):
-      """Returns True is the entry is found in the list, otherwise False"""
+   def keys(self):
+      """Return the keys in the dictionary"""
       self.__lock__()
-      value = entry in self.__list__
+      list = self.__list__.keys()
       self.__unlock__()
-      return value
+      return list
+
+   def values(self):
+      """Return the values stored in the dictionary"""
+      self.__lock__()
+      list = self.__list__.values()
+      self.__unlock__()
+      return list
+
+class work_data(object):
+   def __init__(self, msg, slot_num, time):
+      self.__AMQP_msg__ = msg
+      self.__slot__ = slot_num
+      self.__access_time__ = time
+
+   def set_AMQP_msg(self, msg):
+      self.__AMQP_msg__ = msg
+
+   def get_AMQP_msg(self):
+      return self.__AMQP_msg__
+
+   AMQP_msg = property(get_AMQP_msg, set_AMQP_msg)
+
+   def set_slot(self, slot_num):
+      self.__slot__ = slot_num
+
+   def get_slot(self):
+      return self.__slot__
+
+   slot = property(get_slot, set_slot)
+
+   def set_access_time(self, time):
+      self.__access_time__ = time
+
+   def get_access_time(self):
+      return self.__access_time__
+
+   access_time = property(get_access_time, set_access_time)
+
+#class threadsafe_list(object):
+#   def __init__(self):
+#      """Creates the default list and sets up the lock"""
+#      self.__access_lock__ = threading.Lock()
+#      self.__list__ = []
+#
+#   def __lock__(self):
+#      """Acquires the lock"""
+#      self.__access_lock__.acquire(True)
+#
+#   def __unlock__(self):
+#      """Releases the lock"""
+#      self.__access_lock__.release()
+#
+#   def add(self, value):
+#      """Adds an entry to the list.  Raises an exception if the value
+#         already exists in the list"""
+#      if self.exists(value) == False:
+#         self.__lock__()
+#         self.__list__.append(value)
+#         self.__unlock__()
+#      else:
+#         raise exception_handler(syslog.LOG_WARNING, "Value %s already exists in the list." % value)
+#
+#   def remove(self, value):
+#      """Removes an entry from the list.  Returns Empty if the entry
+#         doesn't exist in the list"""
+#      pos = int(self.__find__(value))
+#      if pos >= 0:
+#         self.__lock__()
+#         removed = self.__list__[pos]
+#         del self.__list__[pos]
+#         self.__unlock__()
+#         return removed
+#      else:
+#         return Empty
+#
+#   def __find__(self, entry):
+#      """Returns the postition of the desired entry in the list.
+#         If the entry doesn't exist in the list, -1 is returned"""
+#      value = -1
+#      self.__lock__()
+#      for pos in range(0,len(self.__list__)):
+#         if entry == self.__list__[pos]:
+#            value = pos
+#            break
+#      self.__unlock__()
+#      return value
+#
+#   def exists(self,entry):
+#      """Returns True is the entry is found in the list, otherwise False"""
+#      self.__lock__()
+#      value = entry in self.__list__
+#      self.__unlock__()
+#      return value
 
 class global_data(object):
    def __init__(self):
-      self.known_slots = threadsafe_list()
-      self.AMQP_messages = threadsafe_dict()
+#      self.known_slots = threadsafe_list()
+#      self.AMQP_messages = threadsafe_dict()
+      self.__work_list__ = threadsafe_dict()
+      self.__max_lease__ = 0
+
+   def set_max_lease_time(self, time):
+      self.__max_lease__ = float(time)
+
+   def get_max_lease_time(self):
+      return self.__max_lease__
+
+   max_lease = property(get_max_lease_time, set_max_lease_time)
+
+   def add_work(self, key, AMQP_msg, slot, time):
+      """Add work information to list of known work items"""
+      self.__work_list__.add(key, work_data(AMQP_msg, slot, time))
+
+   def remove_work(self, key):
+      """Remove work information from the list of known work items and
+         return the work removed.  If the work with the specified key
+         doesn't exist, Empty is returned"""
+      return self.__work_list__.remove(key)
+
+   def get_work(self, key):
+      """Get work information from the list of known work items.  If the
+         work with the given key doesn't exist, Empty is returned"""
+      return self.__work_list__.get(key)
+
+   def slot_in_use(self, slot_num):
+      """Returns True if the given slot is currently processing work,
+         False otherwise"""
+      for work in self.__work_list__.values():
+         if work.slot == slot_num:
+            return True
+      return False
+
+   def values(self):
+      """Returns a list of work_data objects which contains all known
+         work information"""
+      return self.__work_list__.values()
+
+def lease_monitor(msg_list, max_lease_time, broker_connection):
+   """Monitor all work for lease expiration.  If a lease expired, the work
+      is released"""
+   while True:
+      expire_time = float(time.time())
+      for item in msg_list.values():
+         if (float(item.access_time) + float(max_lease_time)) < expire_time:
+            # The lease for this message has expired, so delete it from the
+            # list of known messages and release the lock
+#            print "Expiring " + item.AMQP_msg.content['message_id']
+            msg_list.remove_work(item.AMQP_msg.content['message_id'])
+            broker_connection.message_release([item.AMQP_msg.command_id, item.AMQP_msg.command_id])
+      time.sleep(1)
 
 def grep(pattern, data):
    """Returns the first instance found of pattern in data.  If pattern
@@ -192,7 +290,7 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
       else:
          slot = slot[0]
 
-      if known_items.known_slots.exists(slot) == True:
+      if known_items.slot_in_use(slot) == True:
 #         print "known slot %s" % slot
          reply.data = ""
          req_socket.send(pickle.dumps(reply,2))
@@ -245,13 +343,10 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
          if job_data.has_key('extra_args') == True and str(job_data['extra_args']) != '':
             reply.data += str(job_data['extra_args'])
 
-         # Preserve the message so we can ack it later
-         known_items.AMQP_messages.add(msg_num, received)
+         # Preserve the work data was processed so it can be
+         # acknowledged, expired, or released as needed
+         known_items.add_work(msg_num, received, slot, time.time())
    
-         # Keep track of which slot is getting work so later we don't try
-         # to get more for a slot that is still doing work
-         known_items.known_slots.add(slot)
-
       # Send the work to the requesting client
       req_socket.send(pickle.dumps(reply,2))
       req_socket.shutdown(socket.SHUT_RD)
@@ -273,11 +368,11 @@ def handle_reply_fetch(msg, known_items, broker_connection):
       message_id = message_id[0]
 
    if msg.type == condor_wf_types.reply_claim_reject:
-      saved_msg = known_items.AMQP_messages.remove(message_id)
+      saved_work = known_items.remove_work(message_id)
    else:
-      saved_msg = known_items.AMQP_messages.get(message_id)
+      saved_work = known_items.get_work(message_id)
 
-   if saved_msg == Empty:
+   if saved_work == Empty:
       # Couldn't find the AMQP message that corresponds to the AMQPID
       # in the exit message.  This is bad and shouldn't happen.
       raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s." % message_id)
@@ -287,10 +382,10 @@ def handle_reply_fetch(msg, known_items, broker_connection):
       results = parse_data_into_AMQP_msg (msg.data)
 
       # Send the results to the appropriate exchange
-      send_AMQP_response(broker_connection, saved_msg, results)
+      send_AMQP_response(broker_connection, saved_work.AMQP_msg, results)
 
    if msg.type == condor_wf_types.reply_claim_reject:
-      broker_connection.message_release([saved_msg.command_id, saved_msg.command_id])
+      broker_connection.message_release([saved_work.AMQP_msg.command_id, saved_work.AMQP_msg.command_id])
 
 def handle_prepare_job(req_socket, reply, known_items):
    """Prepare the environment for the job.  This includes extracting any
@@ -309,8 +404,8 @@ def handle_prepare_job(req_socket, reply, known_items):
    # in the message received
    work_cwd = grep('^OriginatingCWD\s*=\s*"(.+)"$', reply.data)[0]
 
-   saved_msg = known_items.AMQP_messages.get(message_id)
-   if saved_msg == Empty:
+   saved_work = known_items.get_work(message_id)
+   if saved_work == Empty:
       # Couldn't find the AMQP message that corresponds to the AMQPID
       # in the exit message.  This is bad and shouldn't happen.
       raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s" % message_id)
@@ -318,7 +413,7 @@ def handle_prepare_job(req_socket, reply, known_items):
       # Place the body of the message, which should contain an archived
       # file, into the directory for the job
       reply.data = ""
-      if saved_msg.content.body != '':
+      if saved_work.AMQP_msg.content.body != '':
         # Write the archived file to disk
         input_filename = work_cwd + "/data.zip"
         input_file = open(input_filename, "wb")
@@ -341,8 +436,8 @@ def handle_evict_claim(msg, known_items, broker_connection):
    else:
       message_id = message_id[0]
 
-   saved_msg = known_items.AMQP_messages.remove(message_id)
-   if saved_msg == Empty:
+   saved_work = known_items.remove_work(message_id)
+   if saved_work == Empty:
       # Couldn't find the AMQP message that corresponds to the AMQPID
       # in the exit message.  This is bad and shouldn't happen.
       raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s.  Message cannot be acknowledged!" % message_id)
@@ -352,8 +447,8 @@ def handle_evict_claim(msg, known_items, broker_connection):
       results = parse_data_into_AMQP_msg (msg.data)
 
       # Send the results to the appropriate exchange
-      send_AMQP_response(broker_connection, saved_msg, results)
-      broker_connection.message_release([saved_msg.command_id, saved_msg.command_id])
+      send_AMQP_response(broker_connection, saved_work.AMQP_msg, results)
+      broker_connection.message_release([saved_work.AMQP_msg.command_id, saved_work.AMQP_msg.command_id])
 
 def handle_update_job_status(msg, known_items, broker_connection):
    """Send the job status update information to a results AMQP queue."""
@@ -366,8 +461,8 @@ def handle_update_job_status(msg, known_items, broker_connection):
    else:
       message_id = message_id[0]
 
-   saved_msg = known_items.AMQP_messages.get(message_id)
-   if saved_msg == Empty:
+   saved_work = known_items.get_work(message_id)
+   if saved_work == Empty:
       # Couldn't find the AMQP message that corresponds to the AMQPID
       # in the exit message.  This is bad and shouldn't happen.
       raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s" % message_id)
@@ -377,7 +472,7 @@ def handle_update_job_status(msg, known_items, broker_connection):
       results = parse_data_into_AMQP_msg (msg.data)
 
       # Send the results to the appropriate exchange
-      send_AMQP_response(broker_connection, saved_msg, results)
+      send_AMQP_response(broker_connection, saved_work.AMQP_msg, results)
 
 def handle_exit(req_socket, msg, known_items, broker_connection, msg_headers):
    """The job exited, so handle the reasoning appropriately.  If the
@@ -392,10 +487,10 @@ def handle_exit(req_socket, msg, known_items, broker_connection, msg_headers):
       if slot == None:
          syslog.syslog(syslog.LOG_WARNING, "Unable to determine SlotID for results.")
       else:
-         # Remove the slot from the list of known slots, as it can now retrieve
-         # more work.
+         # Verify the slot sending results is known to be in use.  If not,
+         # somehow results have been send from an unknown slot.
          slot = slot[0]
-         if known_items.known_slots.remove(slot) == Empty:
+         if known_items.slot_in_use(slot) == False:
             syslog.syslog(syslog.LOG_WARNING, "Received exit message from unknown slot %s" % slot)
 
       # Find the AMQPID in the message we received
@@ -415,24 +510,26 @@ def handle_exit(req_socket, msg, known_items, broker_connection, msg_headers):
 
       # Retrieve the AMQP message from the list of known messages so it
       # can be acknowledged or released
-      ack_msg = known_items.AMQP_messages.get(message_id)
-      if ack_msg == Empty:
+      saved_work =  known_items.remove_work(message_id)
+      if saved_work == Empty:
          # Couldn't find the AMQP message that corresponds to the AMQPID
          # in the exit message.  This is bad and shouldn't happen.
          raise exception_handler(syslog.LOG_ERR, "Unable to find stored AMQP message with AMQPID %s.  Message cannot be acknowledged!" % message_id)
       else:
+         ack_msg = saved_work.AMQP_msg
+
          # If any files were specified to be retrieved via the 'result_files'
          # field, then create an archive of the files (if they exist) and
          # place it in the body of the results message
          if ack_msg.content['application_headers'].has_key('result_files')  == True  and str(ack_msg.content['application_headers']['result_files']) != '':
             orig_cwd = os.getcwd()
             os.chdir(work_cwd)
-            zip = zipfile.ZipFile("results.zip", "w")
-            for result_file in ack_msg.content["application_headers"]["result_files"].split(' '):
+            zip = zipfile.ZipFile('results.zip', 'w')
+            for result_file in ack_msg.content['application_headers']['result_files'].split(' '):
                if os.path.exists(result_file) == True:
                   zip.write(result_file)
             zip.close()
-            archived_file = open("results.zip", "rb")
+            archived_file = open('results.zip', 'rb')
             results.body = archived_file.read()
             archived_file.close()
             os.chdir(orig_cwd)
@@ -448,7 +545,6 @@ def handle_exit(req_socket, msg, known_items, broker_connection, msg_headers):
 
             # Acknowledge the message
             ack_msg.complete(cumulative=False)
-            known_items.AMQP_messages.remove(message_id)
          else:
             # Job didn't exit normally, so release the lock for the message
 #            print "Not normal exit: " + str(msg.type)
@@ -497,7 +593,7 @@ def main(argv=None):
 
       # Setup the AMQP connections
       client = Client(broker['ip'], int(broker['port']), qpid.spec.load(broker['spec']))
-      client.start({"LOGIN": broker['user'], "PASSWORD": broker['password']})
+      client.start({'LOGIN': broker['user'], 'PASSWORD': broker['password']})
       session = client.session()
       session.session_open()
       session.message_subscribe(queue=broker['queue'], destination=dest, confirm_mode = 1)
@@ -505,13 +601,18 @@ def main(argv=None):
       session.message_flow(dest, 1, 0xFFFFFFFF)
       work_queue = client.queue(dest)
 
+      # Create a thread to monitor work expiration times
+      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, server['lease_time'], session))
+      monitor_thread.setDaemon(True)
+      monitor_thread.start()
+
       # Setup the socket for communication with condor
       listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       try:
          listen_socket.bind((server['ip'], int(server['port'])))
          listen_socket.listen(int(server['queued_connections']))
       except socket.error, error:
-         raise exception_handler(syslog.LOG_ERR, "Failed to listen on %s:%s" % (server['ip'], server['port']))
+         raise exception_handler(syslog.LOG_ERR, 'Failed to listen on %s:%s' % (server['ip'], server['port']))
 
       # Accept all incoming connections and act accordingly
       while True:
@@ -537,7 +638,7 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.exit_evict:
             child = threading.Thread(target=handle_exit, args=(sock, condor_msg, share_data, session, AMQP_headers))
          else:
-            print "Unknown type"
+            print 'Unknown type'
          child.setDaemon(True)
          child.start()
 
@@ -554,5 +655,5 @@ def main(argv=None):
             syslog.syslog(error.level, msg)
       return 1
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())
