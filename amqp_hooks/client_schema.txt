@@ -16,7 +16,7 @@ prerun_data : encoded_binary (opt)       # Files to be transfered as part of the
 extra_args : list_of_strings (opt)       # Optional additional attributes to add to the ClassAd
 
 AMQP specifics:
-ttl : 64 bit unsigned integer            # Number of seconds the job is valid
+ttl : 64 bit unsigned integer            # Number of milliseconds the job is valid
 message_id : 64 bit unsigned integer     # Unique message ID
 reply_to_queue : AMQP_topic              # Queue to send results to
 

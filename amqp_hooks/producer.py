@@ -36,13 +36,13 @@ def dump_queue(client, queue_name, session):
          message = queue.get(timeout=to)
          count = count + 1
 #         content = message.content.body
-#         job_data = message.content['application_headers']
-#         print "Headers:"
-#         for header in job_data.keys():
-#            print header + ": " + job_data[header]
-#          print ""
-#          print "Body: "
-#          print content
+         job_data = message.content['application_headers']
+         print "Headers:"
+         for header in job_data.keys():
+            print header + ": " + job_data[header]
+         print ""
+#         print "Body: "
+#         print content
 #          file = open("results.zip", "wb")
 #          file.write(content)
 #          file.close()
@@ -94,22 +94,22 @@ archived_file = open ("test.zip", "rb")
 file_data = archived_file.read()
 archived_file.close()
 
-work_request = Content(file_data, properties={"application_headers":{'Cmd': "", 'Arguments': "", 'Iwd' : "", 'Owner' : "", 'User' : ""}})
+#work_request = Content(file_data, properties={"application_headers":{'Cmd': "", 'Arguments': "", 'Iwd' : "", 'Owner' : "", 'User' : ""}})
+work_request = Content(file_data, properties={"application_headers":{}})
 #work_request = Content('', properties={"application_headers":{'Cmd': "", 'Arguments': "", 'Iwd' : "", 'Owner' : "", 'User' : ""}})
 work_request["message_id"] = base64.urlsafe_b64encode(session_id)
-#work_request["application_headers"]["Cmd"] = "./test_run.sh"
+work_request["ttl"] = 10000
 #work_request["application_headers"]["Cmd"] = "test_run.sh"
-work_request["application_headers"]["Cmd"] = "/bin/true"
-#work_request["application_headers"]["Arguments"] = "30"
-work_request["application_headers"]["Iwd"] = "."
-#work_request["application_headers"]["Iwd"] = "/tmp"
-work_request["application_headers"]["Owner"] = "rsquared"
-work_request["application_headers"]["User"] = "rrati@redhat.com"
+work_request["application_headers"]["Cmd"] = "\"/bin/true\""
+#work_request["application_headers"]["Cmd"] = "/bin/sleep"
+#work_request["application_headers"]["Arguments"] = "60"
+work_request["application_headers"]["Iwd"] = "\"/tmp\""
+work_request["application_headers"]["Owner"] = "\"bob\""
+work_request["application_headers"]["User"] = "\"bob@redhat.com\""
 #work_request["application_headers"]["result_files"] = "output output2 output3"
-work_request["application_headers"]["extra_args"] = """Field1 = value
-Field2 = "value"
-Field3 = "value"
-"""
+work_request["application_headers"]["Field1"] = "\"value\""
+work_request["application_headers"]["Field2"] = "3.125345"
+work_request["application_headers"]["Field3"] = "2"
 work_request["routing_key"] = "grid"
 work_request["reply_to"] = client.spec.struct("reply_to")
 work_request["reply_to"]["exchange_name"] = "amq.direct"
@@ -124,7 +124,7 @@ if pid != 0:
    time.sleep(2)
 #   print "Started sending messages: " + str(time.localtime())
    print "Started sending messages: " + str(time.time())
-   for num in range(0,1000):
+   for num in range(0,1):
       session.message_transfer(destination="amq.direct", content=work_request)
       work_request["message_id"] = base64.urlsafe_b64encode("154582592462058724" + str(num))
       count = num

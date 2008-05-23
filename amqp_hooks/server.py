@@ -126,66 +126,8 @@ class work_data(object):
 
    access_time = property(get_access_time, set_access_time)
 
-#class threadsafe_list(object):
-#   def __init__(self):
-#      """Creates the default list and sets up the lock"""
-#      self.__access_lock__ = threading.Lock()
-#      self.__list__ = []
-#
-#   def __lock__(self):
-#      """Acquires the lock"""
-#      self.__access_lock__.acquire(True)
-#
-#   def __unlock__(self):
-#      """Releases the lock"""
-#      self.__access_lock__.release()
-#
-#   def add(self, value):
-#      """Adds an entry to the list.  Raises an exception if the value
-#         already exists in the list"""
-#      if self.exists(value) == False:
-#         self.__lock__()
-#         self.__list__.append(value)
-#         self.__unlock__()
-#      else:
-#         raise exception_handler(syslog.LOG_WARNING, "Value %s already exists in the list." % value)
-#
-#   def remove(self, value):
-#      """Removes an entry from the list.  Returns Empty if the entry
-#         doesn't exist in the list"""
-#      pos = int(self.__find__(value))
-#      if pos >= 0:
-#         self.__lock__()
-#         removed = self.__list__[pos]
-#         del self.__list__[pos]
-#         self.__unlock__()
-#         return removed
-#      else:
-#         return Empty
-#
-#   def __find__(self, entry):
-#      """Returns the postition of the desired entry in the list.
-#         If the entry doesn't exist in the list, -1 is returned"""
-#      value = -1
-#      self.__lock__()
-#      for pos in range(0,len(self.__list__)):
-#         if entry == self.__list__[pos]:
-#            value = pos
-#            break
-#      self.__unlock__()
-#      return value
-#
-#   def exists(self,entry):
-#      """Returns True is the entry is found in the list, otherwise False"""
-#      self.__lock__()
-#      value = entry in self.__list__
-#      self.__unlock__()
-#      return value
-
 class global_data(object):
    def __init__(self):
-#      self.known_slots = threadsafe_list()
-#      self.AMQP_messages = threadsafe_dict()
       self.__work_list__ = threadsafe_dict()
       self.__max_lease__ = 0
 
@@ -276,13 +218,13 @@ def send_AMQP_response(connection, orig_req, send_msg):
 def exit_signal_handler(signum, frame):
    raise exit_signal("Exit signal %s received" % signum)
 
-def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connection, msg_headers):
+def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connection):
    """Retrieve a message from an AMQP queue and send it back to the
       requesting client"""
 #   print "handle_get_work called " + str(time.localtime())
 
    # List of message headers that need special treatment
-   special = ["Owner", "KillSig", "extra_args", "Iwd"]
+   special = ["Owner"]
 
    try:
       # Figure out the SlotID that is requesting work, and don't get any
@@ -313,6 +255,7 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
          req_socket.close()
          return
 
+      print msg
       if msg.properties.has_key('message_id') == False or msg['message_id'] == '':
          syslog.syslog(syslog.LOG_ERR, "Request does not have message_id, and is unusable.  Discarding")
          reply.data = ""
@@ -320,40 +263,33 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
          reject_msg.body = "ERROR: Work Request does not have a unique message_id and was rejected."
          send_AMQP_response(broker_connection, received, reject_msg)
          received.complete()
+      elif msg.properties.has_key('expiration') == True and msg['expiration'] > time.time():
+         print "Message has expired and shouldn't be processed"
       else:
          # Create the ClassAd to send to the requesting client
          msg_num = str(msg['message_id'])
-         if job_data.has_key('Iwd') and str(job_data['Iwd']) != '':
-            iwd = str(job_data['Iwd'])
-         else:
-            iwd = str("/tmp/condor_job." + str(os.getpid()))
          reply.data = "AMQPID = \"" + msg_num + "\"\n"
          reply.data += "WF_REQ_SLOT = \"" + slot + "\"\n"
          reply.data += "JobUniverse = 5\n"
 #         reply.data += "JobLeaseDuration = 500000\n"
 #         reply.data += "JobLeaseDuration = 3\n"
          reply.data += "IsFeatched = TRUE\n"
-         reply.data += "Iwd = \"" + iwd + "\"\n"
-         for field in [header for header in msg_headers.keys() if header not in special]:
-            if job_data.has_key(field) == True and str(job_data[field]) != '':
-               reply.data += field + " = \"" + str(job_data[field]) + "\"\n"
+         for field in [header for header in job_data.keys() if header not in special]:
+            reply.data += field + " = " + str(job_data[field]) + "\n"
          if job_data.has_key('Owner') == True and str(job_data['Owner']) != '':
-            reply.data += "Owner = \"" + str(job_data['Owner']) + "\"\n"
+            reply.data += "Owner = " + str(job_data['Owner']) + "\n"
          else:
             reply.data += "Owner = \"nobody\"\n"
-         if job_data.has_key('KillSig') == True and str(job_data['KillSig']) != '':
-            reply.data += "KillSig = " + str(job_data['KillSig'])
-         if job_data.has_key('extra_args') == True and str(job_data['extra_args']) != '':
-            reply.data += str(job_data['extra_args'])
 
          # Preserve the work data was processed so it can be
          # acknowledged, expired, or released as needed
          known_items.add_work(msg_num, received, slot, time.time())
    
-      # Send the work to the requesting client
-      req_socket.send(pickle.dumps(reply,2))
-      req_socket.shutdown(socket.SHUT_RD)
-      req_socket.close()
+         # Send the work to the requesting client
+         print reply.data
+         req_socket.send(pickle.dumps(reply,2))
+         req_socket.shutdown(socket.SHUT_RD)
+         req_socket.close()
 
    except exception_handler, error:
       for msg in error.msgs:
@@ -389,6 +325,7 @@ def handle_reply_fetch(msg, known_items, broker_connection):
 
    if msg.type == condor_wf_types.reply_claim_reject:
       broker_connection.message_release([saved_work.AMQP_msg.command_id, saved_work.AMQP_msg.command_id])
+      print "Work rejected"
 
 def handle_prepare_job(req_socket, reply, known_items):
    """Prepare the environment for the job.  This includes extracting any
@@ -483,7 +420,7 @@ def handle_update_job_status(msg, known_items, broker_connection):
       # Send the results to the appropriate exchange
       send_AMQP_response(broker_connection, saved_work.AMQP_msg, results)
 
-def handle_exit(req_socket, msg, known_items, broker_connection, msg_headers):
+def handle_exit(req_socket, msg, known_items, broker_connection):
    """The job exited, so handle the reasoning appropriately.  If the
       job exited normally, then remove the work job from the AMQP queue,
       otherwise release the lock on the work.  Always place the results
@@ -577,11 +514,6 @@ def main(argv=None):
    parser = ConfigParser.ConfigParser()
    broker = {}
    dest = "work_requests"
-   AMQP_headers = {'Cmd': "", 'Arguments': "", 'Environment': "", 'Err': "",
-                   'In': "", 'StarterUserLog': "",'StarterUserLogUseXML': "",
-                   'Out': "", 'Iwd': "", 'Owner': "", 'KillSig': "",
-                   'result_files': "", 'preconfigure_script': "",
-                   'extra_args': ""}
 
    if argv is None:
       argv = sys.argv
@@ -633,7 +565,7 @@ def main(argv=None):
 
          # Set up a child thread to perform the desired action
          if condor_msg.type == condor_wf_types.get_work:
-            child = threading.Thread(target=handle_get_work, args=(sock, condor_msg, work_queue, share_data, session, AMQP_headers))
+            child = threading.Thread(target=handle_get_work, args=(sock, condor_msg, work_queue, share_data, session))
          elif condor_msg.type == condor_wf_types.reply_claim_accept or \
               condor_msg.type == condor_wf_types.reply_claim_reject:
             child = threading.Thread(target=handle_reply_fetch, args=(condor_msg, share_data, session))
@@ -647,7 +579,7 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.exit_remove or \
               condor_msg.type == condor_wf_types.exit_hold or \
               condor_msg.type == condor_wf_types.exit_evict:
-            child = threading.Thread(target=handle_exit, args=(sock, condor_msg, share_data, session, AMQP_headers))
+            child = threading.Thread(target=handle_exit, args=(sock, condor_msg, share_data, session))
          else:
             print 'Unknown type'
          child.setDaemon(True)
