@@ -14,8 +14,11 @@ import signal
 import zipfile
 import copy
 from amqp_common import *
-from qpid.client import Client
-from qpid.content import Content
+#from qpid.client import Client
+#from qpid.content import Content
+from qpid.util import connect
+from qpid.connection import Connection
+from qpid.datatypes import Message, RangedSet, uuid4
 from qpid.queue import Empty
 
 class exit_signal(Exception):
@@ -180,8 +183,9 @@ def lease_monitor(msg_list, max_lease_time, interval, broker_connection):
             # The lease for this message has expired, so delete it from the
             # list of known messages and release the lock
 #            print "Expiring " + item.AMQP_msg.content['message_id']
-            msg_list.remove_work(item.AMQP_msg.content['message_id'])
-            broker_connection.message_release([item.AMQP_msg.command_id, item.AMQP_msg.command_id])
+            msg_list.remove_work(item.AMQP_msg.message_id)
+#            broker_connection.message_release([item.AMQP_msg.command_id, item.AMQP_msg.command_id])
+            broker_connection.message_release(RangedSet(item.AMQP_msg.id))
       time.sleep(int(interval))
 
 def grep(pattern, data):
@@ -198,22 +202,26 @@ def grep(pattern, data):
       found = match
    return found
 
-def parse_data_into_AMQP_msg(data):
-   """Takes the data and parses it into the headers specified in an AMQP
-      message.  extra_args is excluded from this, as that is a more complicated
-      field"""
-   msg = Content(properties={'application_headers':{}})
+def parse_data_into_AMQP_headers(data, session):
+   """Takes a set of data and parses it into the application_headers in an
+      AMQP message property.  Returns the message property with the headers
+      filled in."""
+   headers = {}
+#   msg =Content(properties={'application_headers':{}})
    for line in data.split('\n'):
       found = grep('^(.+)\s*=\s*(.*)$', line)
       if found != None:
-         msg['application_headers'][found[0]] = found[1]
-   return msg
+         headers[found[0]] = found[1]
+   return session.message_properties(application_headers=headers)
 
-def send_AMQP_response(connection, orig_req, send_msg):
+def send_AMQP_response(connection, orig_req, msg_properties, data=None):
    """Sends send_msg to the reply_to queue in orig_req using the broker
       connection 'connection'"""
-   send_msg["routing_key"] = orig_req.content["reply_to"]["routing_key"]
-   connection.message_transfer(destination=orig_req.content["reply_to"]["exchange_name"], content=send_msg)
+   reply_to = orig_req.get("message_properties").reply_to
+   delivery_props = connection.delivery_properties(routing_key=reply_to["routing_key"])
+#   send_msg["routing_key"] = orig_req.content["reply_to"]["routing_key"]
+#   connection.message_transfer(destination=orig_req.content["reply_to"]["exchange_name"], content=send_msg)
+   connection.message_transfer(destination=reply_to["exchange"], message=Message(msg_properties, delivery_props, data))
 
 def exit_signal_handler(signum, frame):
    raise exit_signal("Exit signal %s received" % signum)
@@ -245,9 +253,10 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
 
       # Get the work off the AMQP work queue if it exists
       try:
-         received = amqp_queue.get(timeout=1)
-         msg = received.content
-         job_data = msg['application_headers']
+#         received = amqp_queue.get(timeout=1)
+         msg = amqp_queue.get(timeout=1)
+#         msg = received.content
+         job_data = msg.get('message_properties').application_headers
       except Empty:
          reply.data = ""
          req_socket.send(pickle.dumps(reply,2))
@@ -255,19 +264,22 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
          req_socket.close()
          return
 
-      print msg
-      if msg.properties.has_key('message_id') == False or msg['message_id'] == '':
+#      print msg
+#      if msg.properties.has_key('message_id') == False or msg['message_id'] == '':
+      if msg.get('message_properties').message_id == '':
+# FIX ME
          syslog.syslog(syslog.LOG_ERR, "Request does not have message_id, and is unusable.  Discarding")
          reply.data = ""
          reject_msg = msg
          reject_msg.body = "ERROR: Work Request does not have a unique message_id and was rejected."
-         send_AMQP_response(broker_connection, received, reject_msg)
-         received.complete()
-      elif msg.properties.has_key('expiration') == True and msg['expiration'] > time.time():
-         print "Message has expired and shouldn't be processed"
+         send_AMQP_response(broker_connection, msg, reject_msg)
+         session.message_accept(RangedSet(msg.id))
+#      elif msg.properties.has_key('expiration') == True and msg['expiration'] > time.time():
+#      elif msg.expiration > time.time():
+#         print "Message has expired and shouldn't be processed"
       else:
          # Create the ClassAd to send to the requesting client
-         msg_num = str(msg['message_id'])
+         msg_num = str(msg.get('message_properties').message_id)
          reply.data = "AMQPID = \"" + msg_num + "\"\n"
          reply.data += "WF_REQ_SLOT = \"" + slot + "\"\n"
          reply.data += "JobUniverse = 5\n"
@@ -283,10 +295,9 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
 
          # Preserve the work data was processed so it can be
          # acknowledged, expired, or released as needed
-         known_items.add_work(msg_num, received, slot, time.time())
+         known_items.add_work(msg_num, msg, slot, time.time())
    
          # Send the work to the requesting client
-         print reply.data
          req_socket.send(pickle.dumps(reply,2))
          req_socket.shutdown(socket.SHUT_RD)
          req_socket.close()
@@ -318,14 +329,15 @@ def handle_reply_fetch(msg, known_items, broker_connection):
    else:
       # Place the data into the appropriate headers for the
       # results message.
-      results = parse_data_into_AMQP_msg (msg.data)
+      msg_props = parse_data_into_AMQP_headers(msg.data, broker_connection)
 
       # Send the results to the appropriate exchange
-      send_AMQP_response(broker_connection, saved_work.AMQP_msg, results)
+      send_AMQP_response(broker_connection, saved_work.AMQP_msg, msg_props)
 
    if msg.type == condor_wf_types.reply_claim_reject:
-      broker_connection.message_release([saved_work.AMQP_msg.command_id, saved_work.AMQP_msg.command_id])
-      print "Work rejected"
+#      broker_connection.message_release([saved_work.AMQP_msg.command_id, saved_work.AMQP_msg.command_id])
+      broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
+#      print "Work rejected"
 
 def handle_prepare_job(req_socket, reply, known_items):
    """Prepare the environment for the job.  This includes extracting any
@@ -356,11 +368,11 @@ def handle_prepare_job(req_socket, reply, known_items):
       # Place the body of the message, which should contain an archived
       # file, into the directory for the job
       reply.data = ""
-      if saved_work.AMQP_msg.content.body != '':
+      if saved_work.AMQP_msg.body != '':
         # Write the archived file to disk
         input_filename = work_cwd + "/data.zip"
         input_file = open(input_filename, "wb")
-        input_file.write(saved_msg.content.body)
+        input_file.write(saved_work.AMQP_msg.body)
         input_file.close()
         reply.data = "data.zip"
 
@@ -387,11 +399,12 @@ def handle_evict_claim(msg, known_items, broker_connection):
    else:
       # Place the data into the appropriate headers for the
       # results message.
-      results = parse_data_into_AMQP_msg (msg.data)
+      msg_props = parse_data_into_AMQP_headers(msg.data, broker_connection)
 
       # Send the results to the appropriate exchange
-      send_AMQP_response(broker_connection, saved_work.AMQP_msg, results)
-      broker_connection.message_release([saved_work.AMQP_msg.command_id, saved_work.AMQP_msg.command_id])
+      send_AMQP_response(broker_connection, saved_work.AMQP_msg, msg_props)
+#      broker_connection.message_release([saved_work.AMQP_msg.command_id, saved_work.AMQP_msg.command_id])
+      broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
 
 def handle_update_job_status(msg, known_items, broker_connection):
    """Send the job status update information to a results AMQP queue."""
@@ -415,10 +428,10 @@ def handle_update_job_status(msg, known_items, broker_connection):
 
       # Place the data into the appropriate headers for the
       # results message.
-      results = parse_data_into_AMQP_msg (msg.data)
+      msg_props = parse_data_into_AMQP_headers(msg.data, broker_connection)
 
       # Send the results to the appropriate exchange
-      send_AMQP_response(broker_connection, saved_work.AMQP_msg, results)
+      send_AMQP_response(broker_connection, saved_work.AMQP_msg, msg_props)
 
 def handle_exit(req_socket, msg, known_items, broker_connection):
    """The job exited, so handle the reasoning appropriately.  If the
@@ -452,11 +465,11 @@ def handle_exit(req_socket, msg, known_items, broker_connection):
 
       # Place the data into the appropriate headers for the
       # results message.
-      results = parse_data_into_AMQP_msg (msg.data)
+      msg_props = parse_data_into_AMQP_headers(msg.data, broker_connection)
 
       # Retrieve the AMQP message from the list of known messages so it
       # can be acknowledged or released
-      saved_work =  known_items.remove_work(message_id)
+      saved_work = known_items.remove_work(message_id)
       if saved_work == Empty:
          # Couldn't find the AMQP message that corresponds to the AMQPID
          # in the exit message.  This is bad and shouldn't happen.
@@ -469,21 +482,23 @@ def handle_exit(req_socket, msg, known_items, broker_connection):
          # field, then create an archive of the files (if they exist) and
          # place it in the body of the results message
          ack_msg = saved_work.AMQP_msg
-         if ack_msg.content['application_headers'].has_key('result_files')  == True  and str(ack_msg.content['application_headers']['result_files']) != '':
+         app_hdrs = ack_msg.get('message_properties').application_headers
+         data = ""
+         if app_hdrs.has_key('result_files')  == True and str(app_hdrs['result_files']) != '':
             orig_cwd = os.getcwd()
             os.chdir(work_cwd)
             zip = zipfile.ZipFile('results.zip', 'w')
-            for result_file in ack_msg.content['application_headers']['result_files'].split(' '):
+            for result_file in app_hdrs['result_files'].split(' '):
                if os.path.exists(result_file) == True:
                   zip.write(result_file)
             zip.close()
             archived_file = open('results.zip', 'rb')
-            results.body = archived_file.read()
+            data = archived_file.read()
             archived_file.close()
             os.chdir(orig_cwd)
 
          # Send the results to the appropriate exchange
-         send_AMQP_response(broker_connection, ack_msg, results)
+         send_AMQP_response(broker_connection, ack_msg, msg_props, data)
 
          if msg.type == condor_wf_types.exit_exit:
             # Job exited normally, so grab the result files, transfer the
@@ -492,12 +507,13 @@ def handle_exit(req_socket, msg, known_items, broker_connection):
 #            print "Normal exit"
 
             # Acknowledge the message
-            ack_msg.complete(cumulative=False)
+            broker_connection.message_accept(RangedSet(ack_msg.id))
+#            ack_msg.complete(cumulative=False)
          else:
             # Job didn't exit normally, so release the lock for the message
 #            print "Not normal exit: " + str(msg.type)
-#            broker_connection.message_release(RangedSet(ack_msg.id))
-            broker_connection.message_release([ack_msg.command_id, ack_msg.command_id])
+            broker_connection.message_release(RangedSet(ack_msg.id))
+#            broker_connection.message_release([ack_msg.command_id, ack_msg.command_id])
 
       # Send acknowledgement to the originator that exit work is complete
       req_socket.send("Completed")
@@ -535,14 +551,17 @@ def main(argv=None):
       share_data = global_data()
 
       # Setup the AMQP connections
-      client = Client(broker['ip'], int(broker['port']), qpid.spec.load(broker['spec']))
-      client.start({'LOGIN': broker['user'], 'PASSWORD': broker['password']})
-      session = client.session()
-      session.session_open()
-      session.message_subscribe(queue=broker['queue'], destination=dest, confirm_mode = 1)
+#      client = Client(broker['ip'], int(broker['port']), qpid.spec.load(broker['spec']))
+#      client.start({'LOGIN': broker['user'], 'PASSWORD': broker['password']})
+      server_socket = connect(broker['ip'], int(broker['port']))
+      connection = Connection(sock=server_socket)
+      connection.start()
+      session = connection.session(str(uuid4()))
+#      session.session_open()
+      session.message_subscribe(queue=broker['queue'], destination=dest, accept_mode=session.accept_mode.explicit)
       session.message_flow(dest, 0, 0xFFFFFFFF)
       session.message_flow(dest, 1, 0xFFFFFFFF)
-      work_queue = client.queue(dest)
+      work_queue = session.incoming(dest)
 
       # Create a thread to monitor work expiration times
       monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, server['lease_time'], server['lease_check_interval'], session))
@@ -589,7 +608,7 @@ def main(argv=None):
       # Close the session before exiting
       listen_socket.shutdown(socket.SHUT_RD)
       listen_socket.close()
-      session.session_close()
+      session.close(timeout=10)
       return 0
 
    except exception_handler, error:
