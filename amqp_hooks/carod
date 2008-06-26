@@ -1,0 +1,758 @@
+#!/usr/bin/python
+#   Copyright 2008 Red Hat, Inc.
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+import socket
+import pickle
+import sys
+import os
+import time
+import qpid
+import syslog
+import re
+import threading
+import signal
+import zipfile
+import getopt
+from caro.common import *
+from qpid.util import connect
+from qpid.connection import Connection
+from qpid.datatypes import Message, RangedSet, uuid4
+from qpid.queue import Empty
+from cStringIO import StringIO
+
+class exit_signal(Exception):
+   def __init__(self, str):
+      self.msg = str
+
+class work_data(object):
+   def __init__(self, msg, slot_num):
+      self.__AMQP_msg__ = msg
+      self.__slot__ = slot_num
+      self.__access_time__ = time.time()
+      self.__access_lock__ = threading.RLock()
+
+   def lock(self, wait=True):
+      """Acquires the lock controlling access to the data in the object"""
+      self.__access_time__ = time.time()
+      return(self.__access_lock__.acquire(wait))
+
+   def unlock(self):
+      """Releases the lock controlling access to the data in the object"""
+      self.__access_time__ = time.time()
+      self.__access_lock__.release()
+
+   def __set_AMQP_msg__(self, msg):
+      self.__access_time__ = time.time()
+      self.__AMQP_msg__ = msg
+
+   def __get_AMQP_msg__(self):
+      self.__access_time__ = time.time()
+      return(self.__AMQP_msg__)
+
+   AMQP_msg = property(__get_AMQP_msg__, __set_AMQP_msg__)
+
+   def __set_slot__(self, slot_num):
+      self.__access_time__ = time.time()
+      self.__slot__ = slot_num
+
+   def __get_slot__(self):
+      self.__access_time__ = time.time()
+      return(self.__slot__)
+
+   slot = property(__get_slot__, __set_slot__)
+
+   def __get_access_time__(self):
+      return(self.__access_time__)
+
+   access_time = property(__get_access_time__)
+
+class global_data(object):
+   def __init__(self):
+      self.__work_list__ = {}
+      self.__access_lock__ = threading.Lock()
+
+   def lock(self, wait=True):
+      """Acquires the lock controlling access to the stored data"""
+      return(self.__access_lock__.acquire(wait))
+
+   def unlock(self):
+      """Releases the lock controlling access to the stored data"""
+      self.__access_lock__.release()
+
+   def add_work(self, key, AMQP_msg, slot):
+      """Add work information to list of known work items.  Raises a
+         general_exception if the key already exists"""
+      work = work_data(AMQP_msg, slot)
+      if self.__find_work__(key) == False:
+         self.lock()
+         self.__work_list__.update({key:work})
+         self.unlock()
+      else:
+         raise general_exception(syslog.LOG_WARNING, 'Key %s already exists.' % key)
+
+   def remove_work(self, key):
+      """Remove work information from the list of known work items and
+         returns the work removed.  The work removed will have its lock()
+         method called, so the caller of this method must unlock the work
+         item when finished.  If the work with the specified key doesn't
+         exist, Empty is returned"""
+      if self.__find_work__(key) == True:
+         self.lock()
+         work = self.__work_list__[key]
+         work.lock()
+         del self.__work_list__[key]
+         self.unlock()
+         return(work)
+      else:
+         return(Empty)
+
+   def get_work(self, key):
+      """Get work information from the list of known work items.  The
+         work removed will have its lock() method called, so the caller
+         of this method must unlock the work item when finished. If the
+         work with the given key doesn't exist, Empty is returned"""
+      if self.__find_work__(key) == True:
+         self.lock()
+         work = self.__work_list__[key]
+         work.lock()
+         self.unlock()
+         return(work)
+      else:
+         return(Empty)
+
+   def slot_in_use(self, slot_num):
+      """Returns True if the given slot is currently processing work,
+         False otherwise"""
+      result = False
+      self.lock()
+      for work in self.__work_list__.values():
+         if work.slot == slot_num:
+            result = True
+            break
+      self.unlock()
+      return(result)
+
+   def __find_work__(self, key):
+      """Returns True if the desired key exists, False otherwise"""
+      self.lock()
+      value = self.__work_list__.has_key(key)
+      self.unlock()
+      return(value)
+
+   def values(self):
+      """Returns a list of work_data objects which contains all known
+         work information
+
+         Warning: This function will not prevent access to the list of
+                  stored data due to its nature of returning a list of
+                  all work_data objects currently stored.  To ensure data
+                  integrity, the caller must call the lock() and unlock()
+                  methods itself """
+      return(self.__work_list__.values())
+
+def lease_monitor(msg_list, max_lease_time, interval, broker_connection, log):
+   """Monitor all work for lease expiration.  If a lease expired, the work
+      is released"""
+   func_name = "lease_monitor"
+   while True:
+      current_time = float(time.time())
+      if log == True:
+         print '%s: max_lease_time = %s' % (func_name, str(max_lease_time))
+         print '%s: Lease check started at %s' % (func_name, str(current_time))
+         print '%s: acquiring list lock' % func_name
+      msg_list.lock()
+      if log == True:
+         print '%s: acquired list lock' % func_name
+      for item in msg_list.values():
+         if log == True:
+            print '%s: access time = %s' % (func_name, str(item.access_time))
+            print '%s: current time = %s' % (func_name, str(current_time))
+         if item.lock(False) == True:
+            if (float(item.access_time) + float(max_lease_time)) < current_time:
+               # No other thread is accessing this item and the lease has
+               # expired, so delete it from the list of known messages and
+               # release the lock on the AMQP message
+               msg_id = item.AMQP_msg.get('message_properties').message_id
+               if log == True:
+                  print '%s: Expiring %s' % (func_name, str(msg_id))
+               msg_list.remove_work(msg_id)
+
+               # Release the message so it can be consumed by another process
+               broker_connection.message_release(RangedSet(item.AMQP_msg.id))
+
+               # Need to unlock the item because the remove_work locks it
+               item.unlock()
+
+            # Need to unlock here even if the message is expired because
+            # work_data uses an RLock, which counts the number of times a
+            # thread has called the lock mechanism, and at this point lock
+            # the lock has been successfully acquired via the lock call above.
+            # This lock is irrespective of the lock released if the message
+            # has been expired
+            item.unlock()
+
+      if log == True:
+         print '%s: releasing list lock' % func_name
+      msg_list.unlock()
+      if log == True:
+         print '%s: released list lock' % func_name
+      time.sleep(int(interval))
+
+def grep(pattern, data):
+   """Returns the first instance found of pattern in data.  If pattern
+      doesn't exist in data, None is returned.  If data contains groups,
+      returns the matching subgroups instead"""
+   for line in data.split('\n'):
+      match = re.match(pattern, line)
+      if match != None:
+         break
+   if match != None and match.groups() != None:
+      found = match.groups()
+   else:
+      found = match
+   return(found)
+
+def parse_data_into_headers(data, session):
+   """Takes a set of data and parses it into the application_headers in an
+      AMQP message property.  Returns the message property with the headers
+      filled in."""
+   headers = {}
+   for line in data.split('\n'):
+      found = grep('^(.+)\s*=\s*(.*)$', line)
+      if found != None:
+         headers[found[0]] = found[1]
+   return(session.message_properties(application_headers=headers))
+
+def send_AMQP_msg(connection, orig_req, msg_properties, data=None):
+   """Sends send_msg to the reply_to queue in orig_req using the broker
+      connection 'connection'"""
+   reply_to = orig_req.get('message_properties').reply_to
+   delivery_props = connection.delivery_properties(routing_key=reply_to['routing_key'])
+   connection.message_transfer(destination=reply_to['exchange'], message=Message(msg_properties, delivery_props, data))
+
+def exit_signal_handler(signum, frame):
+   raise exit_signal('Exit signal %s received' % signum)
+
+def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connection, log):
+   """Retrieve a message from an AMQP queue and send it back to the
+      requesting client"""
+   func_name = "handle_get_work"
+   if log == True:
+      print '%s called at %s' % (func_name, str(time.localtime()))
+
+   # List of message headers that need special treatment
+   special = ['Owner']
+
+   try:
+      # Figure out the SlotID that is requesting work, and don't get any
+      # more work if it is still processing work from a previous call
+      slots = grep('^SlotID\s*=\s*(.+)$', reply.data)
+      if slots == None:
+         syslog.syslog(syslog.LOG_ERR, 'Unable to determine SlotID for request.')
+      else:
+         slot = slots[0]
+
+      if log == True:
+         print '%s: Checking if slot %s is known' % (func_name, str(slot))
+      if known_items.slot_in_use(slot) == True:
+         if log == True:
+            print '%s: known slot %s' % (func_name, str(slot))
+         reply.data = ''
+         req_socket.send(pickle.dumps(reply, 2))
+         close_socket(req_socket)
+         return(SUCCESS)
+
+      # Get the work off the AMQP work queue if it exists
+      try:
+         msg = amqp_queue.get(timeout=1)
+         job_data = msg.get('message_properties').application_headers
+      except:
+         reply.data = ''
+         req_socket.send(pickle.dumps(reply, 2))
+         close_socket(req_socket)
+         return(SUCCESS)
+
+      reply_to = msg.get('message_properties').reply_to
+#      delivery_props = connection.delivery_properties(routing_key=reply_to['routing_key'])
+      if reply_to == None or reply_to == '':
+         err_msg = 'ERROR: Work Request does not have a reply_to field and is unusable.  Discarding'
+         reply.data = ''
+         broker_connection.message_accept(RangedSet(msg.id))
+         req_socket.send(pickle.dumps(reply, 2))
+         close_socket(req_socket)
+         raise general_exception(syslog.LOG_ERR, err_msg)
+      elif msg.get('message_properties').message_id == None:
+         err_msg = 'ERROR: Work Request does not have a unique message_id and is unusable.  Discarding'
+         msg_props = msg.get('message_properties')
+         reply.data = ''
+         send_AMQP_msg(broker_connection, msg, msg_props, err_msg)
+         broker_connection.message_accept(RangedSet(msg.id))
+         req_socket.send(pickle.dumps(reply, 2))
+         close_socket(req_socket)
+         raise general_exception(syslog.LOG_ERR, err_msg)
+#      elif msg.properties.has_key('expiration') == True and msg['expiration'] > time.time():
+#      elif msg.expiration > time.time():
+#         print '%s: Message has expired and shouldn't be processed' % func_name
+      else:
+         # Create the ClassAd to send to the requesting client
+         msg_num = str(msg.get('message_properties').message_id)
+         reply.data = 'AMQPID = "' + msg_num + '"\n'
+         reply.data += 'WF_REQ_SLOT = "' + slot + '"\n'
+         reply.data += 'JobUniverse = 5\n'
+#         reply.data += 'JobLeaseDuration = 500000\n'
+#         reply.data += 'JobLeaseDuration = 3\n'
+         reply.data += 'IsFeatched = TRUE\n'
+         for field in [header for header in job_data.keys() if header not in special]:
+            reply.data += field + ' = ' + str(job_data[field]) + '\n'
+         if job_data.has_key('Owner') == True and str(job_data['Owner']) != '':
+            reply.data += 'Owner = ' + str(job_data['Owner']) + '\n'
+         else:
+            reply.data += 'Owner = "nobody"\n'
+
+         # Preserve the work data was processed so it can be
+         # acknowledged, expired, or released as needed
+         if log == True:
+            print '%s: Adding msg id %s to known items' % (func_name, msg_num)
+         known_items.add_work(msg_num, msg, slot)
+   
+      # Send the work to the requesting client
+      req_socket.send(pickle.dumps(reply, 2))
+      close_socket(req_socket)
+      return(SUCCESS)
+
+   except general_exception, error:
+      log_messages(error)
+      return(FAILURE)
+
+def handle_reply_fetch(msg, known_items, broker_connection, log):
+   """Send the data from a reply claim hook to a results AMQP queue.  Release
+      the lock on the receiving AMQP queue in the case of a reject"""
+   func_name = "handle_reply_fetch"
+   if log == True:
+      print '%s called at %s' % (func_name, str(time.localtime()))
+   saved_work = Empty
+   try:
+      # Find the AMQPID in the message received
+      message_id = grep('^AMQPID\s*=\s*"(.+)"$', msg.data)
+      if message_id == None:
+         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find AMQPID in exit message')
+      else:
+         message_id = message_id[0]
+
+      if msg.type == condor_wf_types.reply_claim_reject:
+         saved_work = known_items.remove_work(message_id)
+      else:
+         saved_work = known_items.get_work(message_id)
+
+      if saved_work == Empty:
+         # Couldn't find the AMQP message that corresponds to the AMQPID
+         # in the exit message.  This is bad and shouldn't happen.
+         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s.' % str(message_id))
+      else:
+         try:
+            # Place the data into the appropriate headers for the
+            # results message.
+            msg_props = parse_data_into_headers(msg.data, broker_connection)
+
+            # Send the results to the appropriate exchange
+            send_AMQP_msg(broker_connection, saved_work.AMQP_msg, msg_props)
+         finally:
+            if log == True:
+               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+            saved_work.unlock()
+
+      if msg.type == condor_wf_types.reply_claim_reject:
+         broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
+         if log == True:
+            print '%s: Work rejected %s' % (func_name, str(message_id))
+
+      return(SUCCESS)
+
+   except general_exception, error:
+      log_messages(error)
+      return(FAILURE)
+
+def handle_prepare_job(req_socket, reply, known_items, log):
+   """Prepare the environment for the job.  This includes extracting any
+      archived data sent with the job request, as well as running a
+      presetup script if one exists."""
+   func_name = "handle_prepare_job"
+   if log == True:
+      print '%s called at %s' % (func_name, str(time.localtime()))
+
+   saved_work = Empty
+   try:
+      # Find the AMQPID in the message received
+      message_id = grep('^AMQPID\s*=\s*"(.+)"$', reply.data)
+      if message_id == None:
+         raise general_exception(syslog.LOG_ERR, reply.data, 'Unable to find AMQPID in prepare job message')
+      else:
+         message_id = message_id[0]
+
+      # Find the Current Working Directory  of the originating process
+      # in the message received
+      work_cwd = grep('^OriginatingCWD\s*=\s*"(.+)"$', reply.data)[0]
+
+      saved_work = known_items.get_work(message_id)
+      if saved_work == Empty:
+         # Couldn't find the AMQP message that corresponds to the AMQPID
+         # in the exit message.  This is bad and shouldn't happen.
+         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s' % str(message_id))
+      else:
+         try:
+            # Place the body of the message, which should contain an archived
+            # file, into the directory for the job
+            reply.data = ''
+            if saved_work.AMQP_msg.body != '':
+               # Write the archived file to disk
+               input_filename = work_cwd + '/data.zip'
+               write_file(input_filename, saved_work.AMQP_msg.body)
+               reply.data = input_filename
+
+            # Send the information about the archive file to the requester
+            req_socket.send(pickle.dumps(reply, 2))
+            close_socket(req_socket)
+         finally:
+            if log == True:
+               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+            saved_work.unlock()
+      return(SUCCESS)
+
+   except general_exception, error:
+      log_messages(error)
+      return(FAILURE)
+
+def handle_evict_claim(msg, known_items, broker_connection, log):
+   """Send the evict claim information to a results AMQP queue."""
+   func_name = "handle_evict_claim"
+   if log == True:
+      print '%s called at %s' % (func_name, str(time.localtime()))
+
+   saved_work = Empty
+   try:
+      # Find the AMQPID in the message received
+      message_id = grep('^AMQPID\s*=\s*"(.+)"$', msg.data)
+      if message_id == None:
+         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find AMQPID in exit message')
+      else:
+         message_id = message_id[0]
+
+      saved_work = known_items.remove_work(message_id)
+      if saved_work == Empty:
+         # Couldn't find the AMQP message that corresponds to the AMQPID
+         # in the exit message.  This is bad and shouldn't happen.
+         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s.' % str(message_id))
+      else:
+         try:
+            # Place the data into the appropriate headers for the
+            # results message.
+            msg_props = parse_data_into_headers(msg.data, broker_connection)
+
+            # Send the results to the appropriate exchange
+            send_AMQP_msg(broker_connection, saved_work.AMQP_msg, msg_props)
+            broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
+         finally:
+            saved_work.unlock()
+
+      return(SUCCESS)
+
+   except general_exception, error:
+      log_messages(error)
+      return(FAILURE)
+
+def handle_update_job_status(msg, known_items, broker_connection, log):
+   """Send the job status update information to a results AMQP queue."""
+   func_name = "handle_update_job_status"
+   if log == True:
+      print '%s called at %s' % (func_name, str(time.localtime()))
+
+   saved_work = Empty
+   try:
+      # Find the AMQPID in the message received
+      message_id = grep('^AMQPID\s*=\s*"(.+)"$', msg.data)
+      if message_id == None:
+         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find AMQPID in exit message')
+      else:
+         message_id = message_id[0]
+
+      saved_work = known_items.get_work(message_id)
+      if log == True:
+         print '%s: Returned from get_work for message %s' % (func_name, str(message_id))
+      if saved_work == Empty:
+         # Couldn't find the AMQP message that corresponds to the AMQPID
+         # in the exit message.  This is bad and shouldn't happen.
+         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s' % str(message_id))
+      else:
+         try:
+            # Place the data into the appropriate headers for the
+            # results message.
+            msg_props = parse_data_into_headers(msg.data, broker_connection)
+
+            # Send the results to the appropriate exchange
+            send_AMQP_msg(broker_connection, saved_work.AMQP_msg, msg_props)
+         finally:
+            if log == True:
+               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+            saved_work.unlock()
+      return(SUCCESS)
+
+   except general_exception, error:
+      log_messages(error)
+      return(FAILURE)
+
+def handle_exit(req_socket, msg, known_items, broker_connection, log):
+   """The job exited, so handle the reasoning appropriately.  If the
+      job exited normally, then remove the work job from the AMQP queue,
+      otherwise release the lock on the work.  Always place the results
+      on the sender's reply_to AMQP queue"""
+   func_name = "handle_exit"
+   if log == True:
+      print '%s called at %s' % (func_name, str(time.localtime()))
+
+   saved_work = Empty
+   try:
+      # Determine the slot that is reporting results
+      slots = grep ('^WF_REQ_SLOT\s*=\s*"(.+)"$', msg.data)
+      if slots == None:
+         syslog.syslog(syslog.LOG_WARNING, msg.data, 'Unable to determine SlotID for results.')
+      else:
+         # Verify the slot sending results is known to be in use.  If not,
+         # somehow results have been send from an unknown slot.
+         slot = slots[0]
+         if known_items.slot_in_use(slot) == False:
+            syslog.syslog(syslog.LOG_WARNING, 'Received exit message from unknown slot %s' % slot)
+
+      # Find the AMQPID in the message we received
+      message_id = grep('^AMQPID\s*=\s*"(.+)"$', msg.data)
+      if message_id == None:
+         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find AMQPID in exit message')
+      else:
+         message_id = message_id[0]
+
+      # Find the Current Working Directory of the originating process
+      # in the message received
+      work_cwd = grep('^OriginatingCWD\s*=\s*"(.+)"$', msg.data)[0]
+
+      # Place the data into the appropriate headers for the
+      # results message.
+      msg_props = parse_data_into_headers(msg.data, broker_connection)
+
+      # Retrieve the AMQP message from the list of known messages so it
+      # can be acknowledged or released
+      saved_work = known_items.remove_work(message_id)
+      if saved_work == Empty:
+         # Couldn't find the AMQP message that corresponds to the AMQPID
+         # in the exit message.  This is bad and shouldn't happen.
+         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s.  Message cannot be acknowledged nor results sent!' % str(message_id))
+      else:
+         try:
+            # If any files were specified to be retrieved via the 
+            # 'result_files' field, then create an archive of the files
+            # (if they exist) and place it in the body of the results message
+            ack_msg = saved_work.AMQP_msg
+            app_hdrs = ack_msg.get('message_properties').application_headers
+            data = None
+            if app_hdrs.has_key('result_files')  == True and \
+               str(app_hdrs['result_files']) != '':
+               # Strip off the quotes from the list of output files
+               file_list = grep('^"(.*)"$', app_hdrs['result_files'])[0]
+
+               # Create an archive in the Current Working Directory (CWD)
+               # that contains the desired output files if they exist
+               orig_cwd = os.getcwd()
+               os.chdir(work_cwd)
+               zip = zipfile.ZipFile('results.zip', 'w')
+               for result_file in file_list.split(' '):
+                  if os.path.exists(result_file) == True:
+                     zip.write(result_file)
+               zip.close()
+               archived_file = open('results.zip', 'rb')
+               data = archived_file.read()
+               archived_file.close()
+               os.chdir(orig_cwd)
+
+            # Send the results to the appropriate exchange
+            send_AMQP_msg(broker_connection, ack_msg, msg_props, data)
+
+            if msg.type == condor_wf_types.exit_exit:
+               # Job exited normally, so grab the result files, transfer the
+               # results to the specified AMQP reply_to queue, and ackowledge
+               # the message on the AMQP work queue
+               if log == True:
+                  print '%s: Normal exit' % func_name
+
+               # Acknowledge the message
+               broker_connection.message_accept(RangedSet(ack_msg.id))
+            else:
+               # Job didn't exit normally, so release the lock for the message
+               if log == True:
+                  print '%s: Not normal exit: %s' % (func_name, str(msg.type))
+               broker_connection.message_release(RangedSet(ack_msg.id))
+         finally:
+            saved_work.unlock()
+
+      # Send acknowledgement to the originator that exit work is complete
+      req_socket.send('Completed')
+      close_socket(req_socket)
+      return(SUCCESS)
+
+   except general_exception, error:
+      log_messages(error)
+      return(FAILURE)
+
+def main(argv=None):
+   dest = 'work_requests'
+   session = None
+   listen_socket = None
+   connection = None
+
+   if argv is None:
+      argv = sys.argv
+
+   try:
+      try:
+         opts, args = getopt.getopt(argv[1:], 'd', ['debug'])
+      except getopt.GetoptError, error:
+        print str(error)
+        return(FAILURE)
+
+      debug_logging = False
+      for option, arg in opts:
+         if option in ('-d', '--debug'):
+            debug_logging = True
+
+      # Open a connection to the system logger
+      syslog.openlog(os.path.basename(argv[0]))
+
+      # Set signal handlers
+      signal.signal(signal.SIGINT, exit_signal_handler)
+
+      try:
+         broker = read_config_file('Broker')
+         server = read_config_file('AMQP_Module')
+      except config_err, error:
+         raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+
+      # Create a container to share data between threads
+      share_data = global_data()
+
+      # Setup the AMQP connections
+      try:
+         server_socket = connect(str(broker['ip']), int(broker['port']))
+         connection = Connection(sock=server_socket)
+         connection.start()
+         session = connection.session(str(uuid4()))
+         session.message_subscribe(queue=broker['queue'], destination=dest, accept_mode=session.accept_mode.explicit)
+      except qpid.session.SessionException, error:
+         # No need to close the session because the session exception will
+         # handle that.
+#         raise general_exception(syslog.LOG_ERR, "AMQP Error %d: %s" % (error[0].error_code, error[0].description))
+         syslog.syslog(syslog.LOG_ERR, 'Broker Connection Error %d: %s' % (error[0].error_code, error[0].description))
+         if connection != None:
+            connection.close()
+         return(FAILURE)
+      except socket.error, error:
+         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+ 
+      session.message_flow(dest, 0, 0xFFFFFFFF)
+      session.message_flow(dest, 1, 0xFFFFFFFF)
+      work_queue = session.incoming(dest)
+
+
+      # Create a thread to monitor work expiration times
+      monitor_thread = threading.Thread(target=lease_monitor, args=(share_data, server['lease_time'], server['lease_check_interval'], session, debug_logging))
+      monitor_thread.setDaemon(True)
+      monitor_thread.start()
+
+      # Setup the socket for communication with condor
+      listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      try:
+         listen_socket.bind((server['ip'], int(server['port'])))
+         listen_socket.listen(int(server['queued_connections']))
+      except socket.error, error:
+         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]), 'Failed to listen on %s:%s' % (server['ip'], server['port']))
+
+      # Accept all incoming connections and act accordingly
+      while True:
+         sock,address = listen_socket.accept()
+         recv_data = socket_read_all(sock)
+         condor_msg = pickle.loads(recv_data)
+
+         # Set up a child thread to perform the desired action
+         if condor_msg.type == condor_wf_types.get_work:
+            child = threading.Thread(target=handle_get_work, args=(sock, condor_msg, work_queue, share_data, session, debug_logging))
+         elif condor_msg.type == condor_wf_types.reply_claim_accept or \
+              condor_msg.type == condor_wf_types.reply_claim_reject:
+            child = threading.Thread(target=handle_reply_fetch, args=(condor_msg, share_data, session, debug_logging))
+         elif condor_msg.type == condor_wf_types.prepare_job:
+            child = threading.Thread(target=handle_prepare_job, args=(sock, condor_msg, share_data, debug_logging))
+#         elif condor_msg.type == condor_wf_types.evict_claim:
+#            child = threading.Thread(target=handle_evict_claim, args=(condor_msg, share_data, session, debug_logging))
+         elif condor_msg.type == condor_wf_types.update_job_status:
+            child = threading.Thread(target=handle_update_job_status, args=(condor_msg, share_data, session, debug_logging))
+         elif condor_msg.type == condor_wf_types.exit_exit or \
+              condor_msg.type == condor_wf_types.exit_remove or \
+              condor_msg.type == condor_wf_types.exit_hold or \
+              condor_msg.type == condor_wf_types.exit_evict:
+            child = threading.Thread(target=handle_exit, args=(sock, condor_msg, share_data, session, debug_logging))
+         else:
+            syslog.syslog(syslog.LOG_WARN, 'Received unknown request: %d' % condor_msg.type)
+            continue
+         child.setDaemon(True)
+         child.start()
+
+   except exit_signal, exit_data:
+      # Close the session before exiting
+      if listen_socket != None:
+         try:
+            listen_socket.shutdown(socket.SHUT_RDWR)
+         except:
+            pass
+         listen_socket.close()
+      if connection != None:
+         try:
+            connection.close()
+         except:
+            pass
+      if session != None:
+         try:
+            session.close(timeout=10)
+         except:
+            pass
+      return(SUCCESS)
+
+   except general_exception, error:
+      log_messages(error)
+      # Close the session before exiting
+      if listen_socket != None:
+         try:
+            listen_socket.shutdown(socket.SHUT_RDWR)
+         except:
+            pass
+         listen_socket.close()
+      if connection != None:
+         try:
+            connection.close()
+         except:
+            pass
+      if session != None:
+         try:
+            session.close(timeout=10)
+         except:
+            pass
+      return(FAILURE)
+
+if __name__ == '__main__':
+    sys.exit(main())

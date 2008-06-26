@@ -1,24 +1,13 @@
-condor_work_desc:
-Arguments : string (opt)                 # Args for the command
-Environment : string (opt)               # Environment variables for the job
-Cmd : string                             # Command to run
-Err : filename (opt)                     # Path to fle to use for stderr
-In : filename (opt)                      # Path to file to use for stdin
-StarterUserLog : filename (opt)          # Log file containing relevant events of the job
-StarterUserLogUseXML : boolean (opt)     # Whether to write log in XML
-Out : string (opt)                       # path to file to store stdout
-IWD : string (opt)                       # Initial working directory
-Owner : string (opt)                     # Who the job will run as, defaults to nobody
-KillSig : int (opt)                      # Signal to send to kill the command
-result_files : string (opt)              # Comma separated names of files to return other than stdout/stderr
-preconfigure_script : string (opt)       # Script to setup the work env
-prerun_data : encoded_binary (opt)       # Files to be transfered as part of the submission.  These could be used by the job or the preconfigure_script
-extra_args : list_of_strings (opt)       # Optional additional attributes to add to the ClassAd
+unique headers:
+result_files : string (optional)         # Space separated names of files to return other than stdout/stderr
 
 AMQP specifics:
 ttl : 64 bit unsigned integer            # Number of milliseconds the job is valid
 message_id : 64 bit unsigned integer     # Unique message ID
-reply_to_queue : AMQP_topic              # Queue to send results to
+reply_to : AMQP_queue                    # Queue to send results to
 
-condor_results:
-result_data : encoded_binary (used by condor) # The results of the job
+Work Request Message Body:
+uncompressed_archive : binary (optional) # The data files for the job
+
+Work Results Message Body:
+uncompressed_archive : binary (optional) # The results of the job

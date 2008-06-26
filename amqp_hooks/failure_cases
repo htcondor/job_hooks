@@ -1,25 +1,25 @@
 Work Submission:
   producer -> AMQP module:
-    - bad/missing headers
+    + bad/missing headers (message_id)
     - corrupted/bad payload
-    - headers with bad data (no AMQPID/reply-to queue)
+    + headers with bad data (no AMQPID/reply-to queue)
 
   workfetch_script -> AMQP module:
-    - AMQP module no listening for connections
+    + AMQP module not listening for connections
     - corrupted/partial request
 
   AMQP module -> workfetch_script
-    - AMQP work queue doesn't exist
-    - workfetch_script not listening for results
+    + workfetch_script not listening for results
     - partial/corrupted ClassAd
+
+  AMQP module <-> Broker
+    + AMQP work queue doesn't exist
+    + Broker not listening
 
 Results:
   job_exit -> AMQP module:
-    - missing AMQPID, no way to remove message from queue
-    - missing SlotID
+    + missing AMQPID, no way to remove message from queue
+    + missing SlotID
 
-  AMQP module -> producer:
-    - AMQP reply-to queue doesn't exist
-
-Generic message failure:
-  - AMQP/Condor lease?
+Generic job failure:
+  + AMQP/Condor lease
