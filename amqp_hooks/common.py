@@ -68,10 +68,9 @@ class config_err(Exception):
       print str
       self.msg = str
 
-def read_config_file(section):
-   """Given a section name, returns a list of all value pairs in the
-      config file as a dictionary"""
-   config_file = '/etc/opt/grid/grid_amqp.conf'
+def read_config_file(config_file, section):
+   """Given config file and section names, returns a list of all value
+      pairs in the config file as a dictionary"""
    parser = ConfigParser.ConfigParser()
 
    # Parse the config file

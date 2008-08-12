@@ -102,7 +102,7 @@ def main(argv=None):
          tout = int(arg)
 
    #  Set parameters for login
-   broker_info = read_config_file('Broker')
+   broker_info = read_config_file('/etc/opt/grid/grid_amqp.conf', 'Broker')
 
    replyTo = str(uuid4())
    pid = os.fork()

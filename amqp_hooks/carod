@@ -623,7 +623,7 @@ def main(argv=None):
 
    try:
       try:
-         opts, args = getopt.getopt(argv[1:], 'd', ['debug'])
+         opts, args = getopt.getopt(argv[1:], 'dh', ['debug', 'help'])
       except getopt.GetoptError, error:
         print str(error)
         return(FAILURE)
@@ -632,6 +632,9 @@ def main(argv=None):
       for option, arg in opts:
          if option in ('-d', '--debug'):
             debug_logging = True
+         if option in ('-h', '--help'):
+            print 'usage: ' + os.path.basename(argv[0]) + ' [-d|--debug] [-h|--help]'
+            return(SUCCESS)
 
       # Open a connection to the system logger
       syslog.openlog(os.path.basename(argv[0]))
@@ -640,8 +643,8 @@ def main(argv=None):
       signal.signal(signal.SIGINT, exit_signal_handler)
 
       try:
-         broker = read_config_file('Broker')
-         server = read_config_file('AMQP_Module')
+         broker = read_config_file('/etc/opt/grid/grid_amqp.conf', 'Broker')
+         server = read_config_file('/etc/opt/grid/grid_amqp.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
@@ -654,6 +657,7 @@ def main(argv=None):
          connection = Connection(sock=server_socket)
          connection.start()
          session = connection.session(str(uuid4()))
+         session.queue_declare(queue=broker['queue'], exclusive=False)
          session.message_subscribe(queue=broker['queue'], destination=dest, accept_mode=session.accept_mode.explicit)
       except qpid.session.SessionException, error:
          # No need to close the session because the session exception will
