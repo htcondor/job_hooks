@@ -20,41 +20,8 @@ import time
 import os
 import zipfile
 import syslog
-from caro.common import *
-
-def zip_extract(filename):
-   zip = zipfile.ZipFile(filename, 'r')
-   contents = zip.namelist()
-
-   # Loop through the archive names and extract the contents
-   # Make sure to create higher level directories before creating a lower
-   # level file or directory (if applicable)
-   for item in sorted(contents):
-      if item.endswith('/'):
-         # This item is all directories, so recursively create them if
-         # they don't already exist
-         if not os.path.exists(item):
-            os.makedirs(item)
-      else:
-         # This is a directory + file or a file by itself, so create the
-         # directory hierarchy first (if applicable) then extract the file.
-         dirs = item.split('/')
-         dir_structure = ''
-         for count in range(0,len(dirs)-1):
-            full_path = os.path.join(dir_structure, dirs[count])
-            if dirs[count] != '' and not os.path.exists(full_path):
-               os.mkdir(full_path)
-            dir_structure = full_path
-
-         write_file(item, zip.read(item))
-
-   # Set the perserved permissions and timestamp for the extracted
-   # files/directories
-   for name in sorted(contents):
-      info = zip.getinfo(name)
-      file_time = time.mktime(info.date_time + (0, 0, -1))
-      os.chmod(name, info.external_attr >> 16L)
-      os.utime(name, (file_time, file_time))
+import tarfile
+from mrg_hooks.functions import *
 
 def main(argv=None):
    if argv is None:
@@ -65,7 +32,7 @@ def main(argv=None):
 
    try:
       try:
-         config = read_config_file('AMQP_Module')
+         config = read_config_file('/etc/opt/grid/daemon.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
@@ -98,7 +65,13 @@ def main(argv=None):
       # Extract the archive if it exists
       if filename != '':
          # Determine the type of archive and then extract it
-         zip_extract(filename)
+         if filename.endswith('.zip') == True:
+            zip_extract(filename)
+         elif filename.endswith('.tar.gz') == True:
+            tarball_extract(filename)
+         else:
+            raise general_exception(syslog.LOG_ERR, 'File %s is in unknown archive format.' % filename)
+         os.remove(filename)
 
       return(SUCCESS)
 

@@ -16,9 +16,9 @@
 import socket
 import pickle
 import sys
-import syslog
 import os
-from caro.common import *
+import syslog
+from mrg_hooks.functions import *
 
 def main(argv=None):
    if argv is None:
@@ -29,13 +29,13 @@ def main(argv=None):
 
    try:
       try:
-         config = read_config_file('AMQP_Module')
+         config = read_config_file('/etc/opt/grid/daemon.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
-      # Create a update_job_status message
+      # Create an evict claim
       request = condor_wf()
-      request.type = condor_wf_types.update_job_status
+      request.type = condor_wf_types.evict_claim
 
       # Store the ClassAd from STDIN in the data portion of the message
       request.data = ''
@@ -46,12 +46,11 @@ def main(argv=None):
       client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       try:
          client_socket.connect((config['ip'], int(config['port'])))
-         client_socket.send (pickle.dumps(request, 2))
+         client_socket.send(pickle.dumps(request, 2))
       except Exception, error:
          close_socket(client_socket)
          raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
       close_socket(client_socket)
-
       return(SUCCESS)
 
    except general_exception, error:

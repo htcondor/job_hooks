@@ -34,7 +34,7 @@ from qpid.util import connect
 from qpid.datatypes import Message, RangedSet, uuid4
 from qpid.connection import Connection
 from qpid.queue import Empty
-from caro.common import *
+from mrg_hooks.functions import *
 
 def dump_queue(queue_name, session):
 
@@ -93,7 +93,7 @@ def main(argv=None):
       argv = sys.argv
 
    #  Set parameters for login
-   broker_info = read_config_file('/etc/opt/grid/grid_amqp.conf', 'Broker')
+   broker_info = read_config_file('/etc/opt/grid/amqp.conf', 'Broker')
 
    replyTo = str(uuid4())
    pid = os.fork()
@@ -119,7 +119,7 @@ def main(argv=None):
       work_headers['Cmd'] = '"test_run.sh"'
       work_headers['Iwd'] = '"."'
       work_headers['Owner'] = '"someone"'
-      work_headers['result_files'] = '"output output2 output3"'
+      work_headers['TransferOutput'] = '"output output2 output3"'
       message_props = session.message_properties(application_headers=work_headers)
       message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
       message_props.message_id = str(uuid4())

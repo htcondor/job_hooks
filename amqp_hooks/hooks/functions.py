@@ -16,6 +16,10 @@ import ConfigParser
 import os
 import socket
 import syslog
+import re
+import tarfile
+import zipfile
+import time
 from cStringIO import StringIO
 
 SUCCESS = 0
@@ -69,8 +73,8 @@ class config_err(Exception):
       self.msg = str
 
 def read_config_file(config_file, section):
-   """Given config file and section names, returns a list of all value
-      pairs in the config file as a dictionary"""
+   """Given configuration file and section names, returns a list of all value
+     	 pairs in the config file as a dictionary"""
    parser = ConfigParser.ConfigParser()
 
    # Parse the config file
@@ -141,3 +145,59 @@ def write_file(filename, data):
    file_ptr.flush()
    file_ptr.close()
 
+def grep(pattern, data):
+   """Returns the first instance found of pattern in data.  If pattern
+      doesn't exist in data, None is returned.  If data contains groups,
+      returns the matching subgroups instead"""
+   for line in data.split('\n'):
+      match = re.match(pattern, line)
+      if match != None:
+         break
+   if match != None and match.groups() != None:
+      found = match.groups()
+   else:
+      found = match
+   return(found)
+
+def zip_extract(filename):
+   """Unzips the contents of the filename given, preserving permissions and
+      ownership"""
+   zip = zipfile.ZipFile(filename, 'r')
+   contents = zip.namelist()
+
+   # Loop through the archive names and extract the contents
+   # Make sure to create higher level directories before creating a lower
+   # level file or directory (if applicable)
+   for item in sorted(contents):
+      if item.endswith('/'):
+         # This item is all directories, so recursively create them if
+         # they don't already exist
+         if not os.path.exists(item):
+            os.makedirs(item)
+      else:
+         # This is a directory + file or a file by itself, so create the
+         # directory hierarchy first (if applicable) then extract the file.
+         dirs = item.split('/')
+         dir_structure = ''
+         for count in range(0,len(dirs)-1):
+            full_path = os.path.join(dir_structure, dirs[count])
+            if dirs[count] != '' and not os.path.exists(full_path):
+               os.mkdir(full_path)
+            dir_structure = full_path
+
+         write_file(item, zip.read(item))
+
+   # Set the perserved permissions and timestamp for the extracted
+   # files/directories
+   for name in sorted(contents):
+      info = zip.getinfo(name)
+      file_time = time.mktime(info.date_time + (0, 0, -1))
+      os.chmod(name, info.external_attr >> 16L)
+      os.utime(name, (file_time, file_time))
+
+def tarball_extract(filename):
+   """Extracts the tarball (.tar.gz) given"""
+   tarball = tarfile.open(filename, 'r:gz')
+   for file in tarball.getnames():
+      tarball.extract(file)
+   tarball.close()

@@ -18,7 +18,7 @@ import pickle
 import sys
 import os
 import syslog
-from caro.common import *
+from mrg_hooks.functions import *
 
 def main(argv=None):
    if argv is None:
@@ -29,20 +29,26 @@ def main(argv=None):
 
    try:
       try:
-         config = read_config_file('AMQP_Module')
+         config = read_config_file('/etc/opt/grid/daemon.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
-      # Create a get_work request
+      # Create a reply_fetch notification
       request = condor_wf()
-      request.type = condor_wf_types.get_work
+      reply_type = sys.argv[1]
+      if reply_type == 'accept':
+         request.type = condor_wf_types.reply_claim_accept
+      elif reply_type == 'reject':
+         request.type = condor_wf_types.reply_claim_reject
+      else:
+         raise general_exception(syslog.LOG_ERR, 'Received unknown reply fetch type: %s' % reply_type)
 
       # Store the ClassAd from STDIN in the data portion of the message
       request.data = ''
       for line in sys.stdin:
          request.data = request.data + str(line)
 
-      # Send the request
+      # Send the message
       client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       try:
          client_socket.connect((config['ip'], int(config['port'])))
@@ -50,13 +56,7 @@ def main(argv=None):
       except Exception, error:
          close_socket(client_socket)
          raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
-
-      # Get receive the work information and print to stdout
-      reply = socket_read_all(client_socket)
       close_socket(client_socket)
-      decoded = pickle.loads(reply)
-      if decoded.data != '':
-         print decoded.data
 
       return(SUCCESS)
 

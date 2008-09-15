@@ -26,7 +26,7 @@ from qpid.util import connect
 from qpid.datatypes import Message, RangedSet, uuid4
 from qpid.connection import Connection
 from qpid.queue import Empty
-from caro.common import *
+from mrg_hooks.functions import *
 
 def dump_queue(queue_name, session, num_msgs, to):
 
@@ -102,7 +102,7 @@ def main(argv=None):
          tout = int(arg)
 
    #  Set parameters for login
-   broker_info = read_config_file('/etc/opt/grid/grid_amqp.conf', 'Broker')
+   broker_info = read_config_file('/etc/opt/grid/amqp.conf', 'Broker')
 
    replyTo = str(uuid4())
    pid = os.fork()

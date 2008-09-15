@@ -1,6 +1,3 @@
-unique headers:
-result_files : string (optional)         # Space separated names of files to return other than stdout/stderr
-
 AMQP specifics:
 ttl : 64 bit unsigned integer            # Number of milliseconds the job is valid
 message_id : 64 bit unsigned integer     # Unique message ID
@@ -10,4 +7,4 @@ Work Request Message Body:
 uncompressed_archive : binary (optional) # The data files for the job
 
 Work Results Message Body:
-uncompressed_archive : binary (optional) # The results of the job
+uncompressed_archive : binary            # The results of the job

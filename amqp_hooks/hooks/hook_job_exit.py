@@ -18,7 +18,7 @@ import pickle
 import sys
 import syslog
 import os
-from caro.common import *
+from mrg_hooks.functions import *
 
 def main(argv=None):
    if argv is None:
@@ -29,7 +29,7 @@ def main(argv=None):
 
    try:
       try:
-         config = read_config_file('AMQP_Module')
+         config = read_config_file('/etc/opt/grid/daemon.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
@@ -65,7 +65,6 @@ def main(argv=None):
 
       # Get acknowledgement that the exit work has completed
       reply = socket_read_all(client_socket)
-      syslog.syslog(syslog.LOG_INFO, str(reply))
       close_socket(client_socket)
 
       return(SUCCESS)
