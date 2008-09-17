@@ -36,7 +36,7 @@ from qpid.connection import Connection
 from qpid.queue import Empty
 from mrg_hooks.functions import *
 
-def dump_queue(queue_name, session):
+def dump_queue(queue_name, session, to ):
 
    print 'Messages queue: ' + queue_name 
 
@@ -53,7 +53,6 @@ def dump_queue(queue_name, session):
    message = 0
    count = 0
    expected = 2
-   to = 5
 
    while True:
       try:
@@ -68,7 +67,7 @@ def dump_queue(queue_name, session):
          print 'Body: '
          print content
          print ''
-         if content != None:
+         if content != None and content != '':
             file = open('results.zip', 'wb')
             file.write(content)
             file.close()
@@ -92,13 +91,27 @@ def main(argv=None):
    if argv is None:
       argv = sys.argv
 
-   #  Set parameters for login
-   broker_info = read_config_file('/etc/opt/grid/amqp.conf', 'Broker')
+   try:
+      opts, args = getopt.getopt(argv[1:], 'hn:t:', ['help', 'timeout='])
+   except getopt.GetoptError, error:
+     print str(error)
+     return(FAILURE)
+
+   tout = 10
+   for option, arg in opts:
+      if option in ('-h', '--help'):
+         print 'usage: ' + os.path.basename(argv[0]) + ' [-h|--help] [-n|--num_messages <num>] [-t|--timeout <num>]'
+         return(SUCCESS)
+      if option in ('-t', '--timeout'):
+         tout = int(arg)
+
+   # Read the carod config file for broker info
+   broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
 
    replyTo = str(uuid4())
    pid = os.fork()
    if pid != 0:
-      #  Create a client and log in to it.
+      # Create a client and log in to it.
       parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
       connection = Connection(sock=parent_socket)
       connection.start()
@@ -114,6 +127,7 @@ def main(argv=None):
       archived_file = open ('test.zip', 'rb')
       file_data = archived_file.read()
       archived_file.close()
+      os.remove('test.zip')
 
       work_headers = {}
       work_headers['Cmd'] = '"test_run.sh"'
@@ -135,14 +149,14 @@ def main(argv=None):
       session.close(timeout=10)
       connection.close()
    else:
-      #  Create a client and log in to it.
+      # Create a client and log in to it.
       child_socket = connect(str(broker_info['ip']), int(broker_info['port']))
       child_connection = Connection(sock=child_socket)
       child_connection.start()
       child_session = child_connection.session(str(uuid4()))
       child_session.queue_declare(queue=replyTo, exclusive=True)
       child_session.exchange_bind(exchange=broker_info['exchange'], queue=replyTo, binding_key=replyTo)
-      dump_queue(replyTo, child_session)
+      dump_queue(replyTo, child_session, tout)
       child_session.close(timeout=10)
       child_connection.close()
    return(SUCCESS)

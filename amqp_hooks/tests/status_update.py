@@ -59,7 +59,7 @@ def dump_queue(queue_name, session, num_msgs, to):
          print 'Body: '
          print content
          print ''
-         if content != None:
+         if content != None and content != '':
             file = open('results.zip', 'wb')
             file.write(content)
             file.close()
@@ -101,13 +101,13 @@ def main(argv=None):
       if option in ('-t', '--timeout'):
          tout = int(arg)
 
-   #  Set parameters for login
-   broker_info = read_config_file('/etc/opt/grid/amqp.conf', 'Broker')
+   # Read the carod config file for broker info
+   broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
 
    replyTo = str(uuid4())
    pid = os.fork()
    if pid != 0:
-      #  Create a client and log in to it.
+      # Create a client and log in to it.
       parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
       connection = Connection(sock=parent_socket)
       connection.start()
@@ -137,7 +137,7 @@ def main(argv=None):
       # Close the session before exiting so there are no open threads.
       session.close(timeout=10)
    else:
-      #  Create a client and log in to it.
+      # Create a client and log in to it.
       child_socket = connect(str(broker_info['ip']), int(broker_info['port']))
       child_connection = Connection(sock=child_socket)
       child_connection.start()

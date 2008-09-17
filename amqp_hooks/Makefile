@@ -1,50 +1,60 @@
-.PHONY: build mrg-hooks caro
+.PHONY: build condor-job-hooks low-latency
 
 RPMBUILD_DIRS := BUILD RPMS SOURCES SPECS SRPMS
 
-NAME := mrg-hooks
+NAME := condor-job-hooks
 HOOKS_SPEC := ${NAME}.spec
-HOOKS_VERSION := $(shell grep -i version: "${NAME}.spec" | awk '{print $$2}')
+HOOKS_VERSION := $(shell grep -i version: "${HOOKS_SPEC}" | awk '{print $$2}')
 HOOKS_SOURCE := ${NAME}-${HOOKS_VERSION}.tar.gz
-NAME := caro
-CARO_SPEC := ${NAME}.spec
-CARO_VERSION := $(shell grep -i version: "${NAME}.spec" | awk '{print $$2}')
-CARO_SOURCE := ${NAME}-${CARO_VERSION}.tar.gz
-tmpdir := $(shell mktemp -d)
+HOOKS_DIR := ${NAME}-${HOOKS_VERSION}
+NAME := low-latency
+LOWLAT_SPEC := ${NAME}.spec
+LOWLAT_VERSION := $(shell grep -i version: "${LOWLAT_SPEC}" | awk '{print $$2}')
+LOWLAT_SOURCE := ${NAME}-${LOWLAT_VERSION}.tar.gz
+LOWLAT_DIR := ${NAME}-${LOWLAT_VERSION}
 
-build: mrg-hooks caro
+build: condor-job-hooks low-latency
 
-mrg-hooks: SPECS/${HOOKS_SPEC} SOURCES/${HOOKS_SOURCE}
+condor-job-hooks: SPECS/${HOOKS_SPEC} SOURCES/${HOOKS_SOURCE}
 	mkdir -p BUILD RPMS SRPMS
 	rpmbuild --define="_topdir ${PWD}" -ba SPECS/${HOOKS_SPEC}
 
-caro: SPECS/${CARO_SPEC} SOURCES/${CARO_SOURCE}
+low-latency: SPECS/${LOWLAT_SPEC} SOURCES/${LOWLAT_SOURCE}
 	mkdir -p BUILD RPMS SRPMS
-	rpmbuild --define="_topdir ${PWD}" -ba SPECS/${CARO_SPEC}
+	rpmbuild --define="_topdir ${PWD}" -ba SPECS/${LOWLAT_SPEC}
 
 SPECS/${HOOKS_SPEC}: ${HOOKS_SPEC}
 	mkdir -p SPECS
 	cp -f ${HOOKS_SPEC} SPECS
 
-SPECS/${CARO_SPEC}: ${CARO_SPEC}
+SPECS/${LOWLAT_SPEC}: ${LOWLAT_SPEC}
 	mkdir -p SPECS
-	cp -f ${CARO_SPEC} SPECS
+	cp -f ${LOWLAT_SPEC} SPECS
 
-SOURCES/${HOOKS_SOURCE}:
+SOURCES/${HOOKS_SOURCE}: hooks/functions.py hooks/hook_evict_claim.py \
+                         hooks/hook_fetch_work.py hooks/hook_job_exit.py \
+                         hooks/hook_prepare_job.py hooks/hook_reply_fetch.py \
+                         hooks/hook_update_job_status.py
 	mkdir -p SOURCES
-	rm -rf mrg-hooks-${HOOKS_VERSION}
-	mkdir mrg-hooks-${HOOKS_VERSION}
-	cp -f hooks/* mrg-hooks-${HOOKS_VERSION}
-	tar -cf ${HOOKS_SOURCE} mrg-hooks-${HOOKS_VERSION}
+	rm -rf ${HOOKS_DIR}
+	mkdir ${HOOKS_DIR}
+	mkdir ${HOOKS_DIR}/config
+	cp -f hooks/* ${HOOKS_DIR}
+	cp -f config/job-hooks.conf ${HOOKS_DIR}/config
+	cp -f LICENSE-2.0.txt ${HOOKS_DIR}
+	tar -cf ${HOOKS_SOURCE} ${HOOKS_DIR}
 	mv "${HOOKS_SOURCE}" SOURCES
 
-SOURCES/${CARO_SOURCE}:
+SOURCES/${LOWLAT_SOURCE}: carod config/carod.conf config/caro.init
 	mkdir -p SOURCES
-	rm -rf caro-${CARO_VERSION}
-	mkdir caro-${CARO_VERSION}
-	cp -f carod caro-${CARO_VERSION}
-	tar -cf ${CARO_SOURCE} caro-${CARO_VERSION}
-	mv "${CARO_SOURCE}" SOURCES
+	rm -rf ${LOWLAT_DIR}
+	mkdir ${LOWLAT_DIR}
+	mkdir ${LOWLAT_DIR}/config
+	cp -f carod ${LOWLAT_DIR}
+	cp -f config/carod.conf config/caro.init ${LOWLAT_DIR}/config
+	cp -f LICENSE-2.0.txt ${LOWLAT_DIR}
+	tar -cf ${LOWLAT_SOURCE} ${LOWLAT_DIR}
+	mv "${LOWLAT_SOURCE}" SOURCES
 
 clean:
-	rm -rf ${RPMBUILD_DIRS} mrg-hooks-${HOOKS_VERSION} caro-${CARO_VERSION}
+	rm -rf ${RPMBUILD_DIRS} ${HOOKS_DIR} ${LOWLAT_DIR}

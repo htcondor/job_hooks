@@ -1,19 +1,45 @@
-To install caro, run the install script as the root user:
-  ./install
+To build the installation packages, run:
+make
 
-Once caro is installed, copy the hook_* scripts to a location that can
-be accessed by condor, then configure the hooks that will be used in
-the condor_config config file.
+This should create RPMs in RPMS/<arch> called low-latency, condor-job-hooks,
+and condor-job-hooks-common.   Install these RPMs.
 
-caro and the hook_* scripts are configured by editing the configuration
-file /etc/opt/grid/grid_amqp.conf.  This file controls which AMQP broker
+Condor (>= 7.0.2-4) will need to be configured in order to use these job
+hooks (ie the low-latency feature).  To configure condor, add the following
+lines to your condor_config (default /etc/condor/) file:
+
+# Startd hooks
+TEST_FETCH_HOOK_FETCH_WORK = $(LOCAL_DIR)/hooks/hook_fetch_work.py
+TEST_FETCH_HOOK_REPLY_FETCH = $(LOCAL_DIR)/hooks/hook_reply_fetch.py
+
+# Starter hooks
+TEST_FETCH_HOOK_PREPARE_JOB = $(LOCAL_DIR)/hooks/hook_prepare_job.py
+TEST_FETCH_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_update_job_status.py
+TEST_FETCH_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_exit.py
+
+SLOT1_JOB_HOOK_KEYWORD = TEST_FETCH
+STARTD_JOB_HOOK_KEYWORD = TEST_FETCH
+STARTER_JOB_HOOK_KEYWORD = TEST_FETCH
+
+FetchWorkDelay = 10 * (Activity == "Idle")
+STARTER_UPDATE_INTERVAL = 30
+
+For more information on Condor/Grid hooks please see:
+https://www.cs.wisc.edu/condor/manual/v7.1/4_4Job_Hooks.html
+
+The AMQP translation daemon (carod) is configured by editing the config file
+/etc/opt/grid/carod.conf.  This file controls which AMQP broker
 to talk to and all relevant options (exchange name, queue, ip, etc), as well 
-as the configuration information for caro itself, which is needed by the
-hook_* scripts to talk to the caro daemon.
+as the configuration information for caro itself.
 
-Once the grid_amqp.conf is configured correctly, make sure the queue exists
-in the AMQP broker and then start condor and carod.  Assuming everything is
-configured correctly, condor can now process jobs from an AMQP broker.
+The Condor job hooks are configured by editing the config file
+/etc/opt/grid/job-hooks.conf.  This file tells the job hooks on what port
+and IP the translation daemon can be contact.
 
-To uninstall caro, run the uninstall script as the root user:
-  ./uninstall
+The carod daemon can be started and stopped via the init file:
+/etc/init.c/caro
+
+To use the low-latency feature, configure condor as mention aboved, ensure
+qpid is running, and start carod.  To submit jobs, send AMQP messages to the
+AMQP queue defined in the /etc/opt/grid/carod.conf configuration file, with
+the classad information stored as headers in the application_headers field.

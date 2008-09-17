@@ -45,7 +45,7 @@ condor_wf_types = wf_type('get_work prepare_job reply_claim_accept reply_claim_r
 # The information about the job
 class condor_wf(object):
     def set_type(self, thetype):
-        self.__type__ = int(thetype)
+           self.__type__ = thetype
 
     def get_type(self):
         return self.__type__
@@ -53,7 +53,7 @@ class condor_wf(object):
     type = property(get_type, set_type)
 
     def set_data(self, string):
-        self.__data__ = str(string)
+           self.__data__ = string
 
     def get_data(self):
         return self.__data__
@@ -109,7 +109,8 @@ def socket_read_all(sock):
       pass
    except Exception, error:
       close_socket(sock)
-      raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+      if error != None:
+         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
    sock.settimeout(old_timeout)
    return msg
 

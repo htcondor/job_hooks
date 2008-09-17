@@ -97,13 +97,13 @@ def main(argv=None):
       if option in ('-t', '--timeout'):
          tout = int(arg)
 
-   #  Set parameters for login
-   broker_info = read_config_file('/etc/opt/grid/amqp.conf', 'Broker')
+   # Read the carod config file for broker info
+   broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
 
    replyTo = str(uuid4())
    pid = os.fork()
    if pid != 0:
-      #  Create a client and log in to it.
+      # Create a client and log in to it.
       parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
       connection = Connection(sock=parent_socket)
       connection.start()
@@ -138,7 +138,7 @@ def main(argv=None):
       session.close(timeout=10)
       connection.close()
    else:
-      #  Create a client and log in to it.
+      # Create a client and log in to it.
       child_socket = connect(str(broker_info['ip']), int(broker_info['port']))
       child_connection = Connection(sock=child_socket)
       child_connection.start()

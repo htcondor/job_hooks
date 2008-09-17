@@ -164,6 +164,31 @@ class global_data(object):
                   methods itself """
       return(self.__work_list__.values())
 
+def shutdown_sockets(sock1, sock2, amqp_con, amqp_session):
+   # Close the session before exiting
+   if sock1 != None:
+      try:
+         sock1.shutdown(socket.SHUT_RDWR)
+      except:
+         pass
+      sock1.close()
+   if sock2 != None:
+      try:
+         sock2.shutdown(socket.SHUT_RDWR)
+      except:
+         pass
+      sock2.close()
+   if amqp_con != None:
+      try:
+         amqp_con.close()
+      except:
+         pass
+   if amqp_session != None:
+      try:
+         amqp_session.close(timeout=10)
+      except:
+         pass
+
 def lease_monitor(msg_list, max_lease_time, interval, broker_connection, log):
    """Monitor all work for lease expiration.  If a lease expired, the work
       is released"""
@@ -575,34 +600,67 @@ def main(argv=None):
    session = None
    listen_socket = None
    connection = None
+   sock = None
+   pidfile = ''
+   daemon_mode = 0
 
    if argv is None:
       argv = sys.argv
 
    try:
       try:
-         opts, args = getopt.getopt(argv[1:], 'dh', ['debug', 'help'])
+         opts, args = getopt.getopt(argv[1:], 'dlhp:', ['daemon', 'logdebug', 'help' 'pidfile='])
       except getopt.GetoptError, error:
         print str(error)
         return(FAILURE)
 
       debug_logging = False
       for option, arg in opts:
-         if option in ('-d', '--debug'):
+         if option in ('-d', '--daemon'):
+            daemon_mode = 1
+         if option in ('-l', '--logdebug'):
             debug_logging = True
          if option in ('-h', '--help'):
-            print 'usage: ' + os.path.basename(argv[0]) + ' [-d|--debug] [-h|--help]'
+            print 'usage: ' + os.path.basename(argv[0]) + ' [-d|--daemon] [-l|--logdebug] [-h|--help] [-p|--pidfile= <pidfile>]'
             return(SUCCESS)
+         if option in ('-p', '--pidfile'):
+            pidfile = arg
+
+      if daemon_mode == 1:
+         try:
+            pid = os.fork()
+         except OSError, error:
+            raise general_exception(syslog.LOG_ERR, "%s [%d]" % (error.strerror, error.errno))
+         if pid == 0:
+            # Child thread.  Fork again to create the daemon
+            os.setsid()
+            try:
+               pid = os.fork()
+            except OSError, error:
+               raise general_exception(syslog.LOG_ERR, "%s [%d]" % (error.strerror, error.errno))
+            if pid == 0:
+               os.chdir('/')
+            else:
+               return(SUCCESS)
+         else:
+            return(SUCCESS)
+
+      # Create the pidfile
+      if pidfile != '':
+         file = open(pidfile, 'w')
+         file.write('%s\n' % str(os.getpid()))
+         file.close()
 
       # Open a connection to the system logger
       syslog.openlog(os.path.basename(argv[0]))
 
       # Set signal handlers
       signal.signal(signal.SIGINT, exit_signal_handler)
+      signal.signal(signal.SIGTERM, exit_signal_handler)
 
       try:
-         broker = read_config_file('/etc/opt/grid/amqp.conf', 'Broker')
-         server = read_config_file('/etc/opt/grid/daemon.conf', 'Daemon')
+         broker = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
+         server = read_config_file('/etc/opt/grid/carod.conf', 'Daemon')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
@@ -675,44 +733,16 @@ def main(argv=None):
          child.start()
 
    except exit_signal, exit_data:
-      # Close the session before exiting
-      if listen_socket != None:
-         try:
-            listen_socket.shutdown(socket.SHUT_RDWR)
-         except:
-            pass
-         listen_socket.close()
-      if connection != None:
-         try:
-            connection.close()
-         except:
-            pass
-      if session != None:
-         try:
-            session.close(timeout=10)
-         except:
-            pass
+      shutdown_sockets(listen_socket, sock, connection, session)
+      if pidfile != '' and os.path.exists(pidfile) == True:
+         os.remove(pidfile)
       return(SUCCESS)
 
    except general_exception, error:
       log_messages(error)
-      # Close the session before exiting
-      if listen_socket != None:
-         try:
-            listen_socket.shutdown(socket.SHUT_RDWR)
-         except:
-            pass
-         listen_socket.close()
-      if connection != None:
-         try:
-            connection.close()
-         except:
-            pass
-      if session != None:
-         try:
-            session.close(timeout=10)
-         except:
-            pass
+      shutdown_sockets(listen_socket, sock, connection, session)
+      if pidfile != '' and os.path.exists(pidfile) == True:
+         os.remove(pidfile)
       return(FAILURE)
 
 if __name__ == '__main__':
