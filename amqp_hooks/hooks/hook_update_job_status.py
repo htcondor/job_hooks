@@ -18,7 +18,7 @@ import pickle
 import sys
 import syslog
 import os
-from mrg_hooks.functions import *
+from jobhooks.functions import *
 
 def main(argv=None):
    if argv is None:

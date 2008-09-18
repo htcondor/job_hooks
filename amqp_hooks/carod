@@ -25,7 +25,7 @@ import threading
 import signal
 import zipfile
 import getopt
-from mrg_hooks.functions import *
+from jobhooks.functions import *
 from qpid.util import connect
 from qpid.connection import Connection
 from qpid.datatypes import Message, RangedSet, uuid4
@@ -165,7 +165,6 @@ class global_data(object):
       return(self.__work_list__.values())
 
 def shutdown_sockets(sock1, sock2, amqp_con, amqp_session):
-   # Close the session before exiting
    if sock1 != None:
       try:
          sock1.shutdown(socket.SHUT_RDWR)
@@ -733,6 +732,7 @@ def main(argv=None):
          child.start()
 
    except exit_signal, exit_data:
+      # Close the session before exiting
       shutdown_sockets(listen_socket, sock, connection, session)
       if pidfile != '' and os.path.exists(pidfile) == True:
          os.remove(pidfile)
@@ -740,6 +740,7 @@ def main(argv=None):
 
    except general_exception, error:
       log_messages(error)
+      # Close the session before exiting
       shutdown_sockets(listen_socket, sock, connection, session)
       if pidfile != '' and os.path.exists(pidfile) == True:
          os.remove(pidfile)

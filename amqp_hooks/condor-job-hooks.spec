@@ -29,11 +29,11 @@ Common functions and utilities used by MRG condor job hooks.
 
 %install
 mkdir -p %{buildroot}/%_var/lib/condor/hooks
-mkdir -p %{buildroot}/%{python_sitelib}/mrg_hooks
+mkdir -p %{buildroot}/%{python_sitelib}/jobhooks
 mkdir -p %{buildroot}/%_sysconfdir/opt/grid
 cp -f hook*.py %{buildroot}/%_var/lib/condor/hooks
-cp -f functions.py %{buildroot}/%{python_sitelib}/mrg_hooks
-touch %{buildroot}/%{python_sitelib}/mrg_hooks/__init__.py
+cp -f functions.py %{buildroot}/%{python_sitelib}/jobhooks
+touch %{buildroot}/%{python_sitelib}/jobhooks/__init__.py
 cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 
 %files
@@ -49,5 +49,5 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %_var/lib/condor/hooks/hook_update_job_status.py*
 
 %files common
-%{python_sitelib}/mrg_hooks/functions.py*
-%{python_sitelib}/mrg_hooks/__init__.py*
+%{python_sitelib}/jobhooks/functions.py*
+%{python_sitelib}/jobhooks/__init__.py*

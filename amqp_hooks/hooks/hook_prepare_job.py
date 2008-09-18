@@ -21,7 +21,7 @@ import os
 import zipfile
 import syslog
 import tarfile
-from mrg_hooks.functions import *
+from jobhooks.functions import *
 
 def main(argv=None):
    if argv is None:
