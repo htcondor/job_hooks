@@ -34,7 +34,8 @@ as the configuration information for caro itself.
 
 The Condor job hooks are configured by editing the config file
 /etc/opt/grid/job-hooks.conf.  This file tells the job hooks on what port
-and IP the translation daemon can be contact.
+and IP the translation daemon can be contact.  The ip and port information
+in this file must match what carod is configured with.
 
 The carod daemon can be started and stopped via the init file:
 /etc/init.c/caro
