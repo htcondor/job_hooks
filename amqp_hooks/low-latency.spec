@@ -10,6 +10,7 @@ Requires: python >= 2.4
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
 Requires: condor-job-hooks-common
+Requires: python-qpid
 
 %description
 Low Latency Scheduling provides a means for bypassing condor's normal
