@@ -29,10 +29,11 @@ Common functions and utilities used by MRG condor job hooks.
 %setup -q
 
 %install
-mkdir -p %{buildroot}/%_var/lib/condor/hooks
+mkdir -p %{buildroot}/%_libexecdir/condor/hooks
 mkdir -p %{buildroot}/%{python_sitelib}/jobhooks
 mkdir -p %{buildroot}/%_sysconfdir/opt/grid
-cp -f hook*.py %{buildroot}/%_var/lib/condor/hooks
+cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
+rm -f %{buildroot}/%_libexecdir/condor/hooks/hook_evict_claim.*
 cp -f functions.py %{buildroot}/%{python_sitelib}/jobhooks
 touch %{buildroot}/%{python_sitelib}/jobhooks/__init__.py
 cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
@@ -42,12 +43,11 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %doc LICENSE-2.0.txt
 %config(noreplace) %{_sysconfdir}/opt/grid/job-hooks.conf
 %defattr(0555,root,root,-)
-%_var/lib/condor/hooks/hook_evict_claim.py*
-%_var/lib/condor/hooks/hook_fetch_work.py*
-%_var/lib/condor/hooks/hook_job_exit.py*
-%_var/lib/condor/hooks/hook_prepare_job.py*
-%_var/lib/condor/hooks/hook_reply_fetch.py*
-%_var/lib/condor/hooks/hook_update_job_status.py*
+%_libexecdir/condor/hooks/hook_fetch_work.py*
+%_libexecdir/condor/hooks/hook_job_exit.py*
+%_libexecdir/condor/hooks/hook_prepare_job.py*
+%_libexecdir/condor/hooks/hook_reply_fetch.py*
+%_libexecdir/condor/hooks/hook_update_job_status.py*
 
 %files common
 %{python_sitelib}/jobhooks/functions.py*
