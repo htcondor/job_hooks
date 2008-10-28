@@ -1,5 +1,5 @@
 Summary: Low Latency Scheduling
-Name: low-latency
+Name: condor-low-latency
 Version: 1.0
 Release: 1%{?dist}
 License: ASL 2.0

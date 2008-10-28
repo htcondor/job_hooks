@@ -1,4 +1,4 @@
-.PHONY: build condor-job-hooks low-latency
+.PHONY: build condor-job-hooks condor-low-latency
 
 RPMBUILD_DIRS := BUILD RPMS SOURCES SPECS SRPMS
 
@@ -7,19 +7,19 @@ HOOKS_SPEC := ${NAME}.spec
 HOOKS_VERSION := $(shell grep -i version: "${HOOKS_SPEC}" | awk '{print $$2}')
 HOOKS_SOURCE := ${NAME}-${HOOKS_VERSION}.tar.gz
 HOOKS_DIR := ${NAME}-${HOOKS_VERSION}
-NAME := low-latency
+NAME := condor-low-latency
 LOWLAT_SPEC := ${NAME}.spec
 LOWLAT_VERSION := $(shell grep -i version: "${LOWLAT_SPEC}" | awk '{print $$2}')
 LOWLAT_SOURCE := ${NAME}-${LOWLAT_VERSION}.tar.gz
 LOWLAT_DIR := ${NAME}-${LOWLAT_VERSION}
 
-build: condor-job-hooks low-latency
+build: condor-job-hooks condor-low-latency
 
 condor-job-hooks: SPECS/${HOOKS_SPEC} SOURCES/${HOOKS_SOURCE}
 	mkdir -p BUILD RPMS SRPMS
 	rpmbuild --define="_topdir ${PWD}" -ba SPECS/${HOOKS_SPEC}
 
-low-latency: SPECS/${LOWLAT_SPEC} SOURCES/${LOWLAT_SOURCE}
+condor-low-latency: SPECS/${LOWLAT_SPEC} SOURCES/${LOWLAT_SOURCE}
 	mkdir -p BUILD RPMS SRPMS
 	rpmbuild --define="_topdir ${PWD}" -ba SPECS/${LOWLAT_SPEC}
 
