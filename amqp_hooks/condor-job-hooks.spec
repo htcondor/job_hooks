@@ -3,9 +3,10 @@
 Summary: Condor Job Hooks
 Name: condor-job-hooks
 Version: 1.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Group: Applications/System
+URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -19,7 +20,7 @@ daemon which interfaces with job delivery protocols outside of condor's
 native job delivery protocol.
 
 %package common
-Summary: Common functions/utilties for condor job hooks
+Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
 BuildRequires: python-devel
 
@@ -43,7 +44,7 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
 %config(noreplace) %{_sysconfdir}/opt/grid/job-hooks.conf
-%defattr(0555,root,root,-)
+%defattr(0755,root,root,-)
 %_libexecdir/condor/hooks/hook_fetch_work.py*
 %_libexecdir/condor/hooks/hook_job_exit.py*
 %_libexecdir/condor/hooks/hook_prepare_job.py*
@@ -51,5 +52,15 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %_libexecdir/condor/hooks/hook_update_job_status.py*
 
 %files common
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt
 %{python_sitelib}/jobhooks/functions.py*
 %{python_sitelib}/jobhooks/__init__.py*
+
+%changelog
+* Fri Nov  4 2008  <rrati@redhat> - 1.0-2
+- Add changelog
+- Fix rpmlint issues
+
+* Fri Nov  4 2008  <rrati@redhat> - 1.0-1
+- Initial packaging

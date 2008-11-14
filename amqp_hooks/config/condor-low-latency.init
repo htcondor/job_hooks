@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# caro            This script allows for stopping and starting the low-latency
-#                 scheduling daemon carod.
+# condor-low-latency  This script allows for stopping and starting the condor
+#                     low-latency scheduling daemon carod.
+#
 # chkconfig: - 91 11
 #
 # description: carod is the low-latency schedule daemon that translates jobs
@@ -65,6 +66,11 @@ case "$1" in
         start
         RETVAL=$?
         ;;
+    reload)
+        stop
+        start
+        RETVAL=$?
+        ;;
     condrestart)
         RETVAL=0
         if [ -f $lockfile ] ; then
@@ -78,7 +84,7 @@ case "$1" in
         RETVAL=$?
         ;;
     *)
-        echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+        echo $"Usage: $0 {start|stop|restart|reload|condrestart|status}"
         RETVAL=2
 esac
 
