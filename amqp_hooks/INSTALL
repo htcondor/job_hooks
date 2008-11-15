@@ -9,17 +9,17 @@ hooks (ie the low-latency feature).  To configure condor, add the following
 lines to your condor_config (default /etc/condor/) file:
 
 # Startd hooks
-TEST_FETCH_HOOK_FETCH_WORK = $(LOCAL_DIR)/hooks/hook_fetch_work.py
-TEST_FETCH_HOOK_REPLY_FETCH = $(LOCAL_DIR)/hooks/hook_reply_fetch.py
+LOW_LATENCY_HOOK_FETCH_WORK = $(LIBEXEC)/hooks/hook_fetch_work.py
+LOW_LATENCY_HOOK_REPLY_FETCH = $(LIBEXEC)/hooks/hook_reply_fetch.py
 
 # Starter hooks
-TEST_FETCH_HOOK_PREPARE_JOB = $(LOCAL_DIR)/hooks/hook_prepare_job.py
-TEST_FETCH_HOOK_UPDATE_JOB_INFO = $(LOCAL_DIR)/hooks/hook_update_job_status.py
-TEST_FETCH_HOOK_JOB_EXIT = $(LOCAL_DIR)/hooks/hook_job_exit.py
+LOW_LATENCY_HOOK_PREPARE_JOB = $(LIBEXEC)/hooks/hook_prepare_job.py
+LOW_LATENCY_HOOK_UPDATE_JOB_INFO = $(LIBEXEC)/hooks/hook_update_job_status.py
+LOW_LATENCY_HOOK_JOB_EXIT = $(LIBEXEC)/hooks/hook_job_exit.py
 
-SLOT1_JOB_HOOK_KEYWORD = TEST_FETCH
-STARTD_JOB_HOOK_KEYWORD = TEST_FETCH
-STARTER_JOB_HOOK_KEYWORD = TEST_FETCH
+SLOT1_JOB_HOOK_KEYWORD = LOW_LATENCY
+STARTD_JOB_HOOK_KEYWORD = LOW_LATENCY
+STARTER_JOB_HOOK_KEYWORD = LOW_LATENCY
 
 FetchWorkDelay = 10 * (Activity == "Idle")
 STARTER_UPDATE_INTERVAL = 30
@@ -38,7 +38,7 @@ and IP the translation daemon can be contact.  The ip and port information
 in this file must match what carod is configured with.
 
 The carod daemon can be started and stopped via the init file:
-/etc/init.c/caro
+/etc/init.d/condor-low-latency
 
 To use the low-latency feature, configure condor as mention aboved, ensure
 qpid is running, and start carod.  To submit jobs, send AMQP messages to the
