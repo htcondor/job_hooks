@@ -317,12 +317,25 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
 #      elif msg.properties.has_key('expiration') == True and msg['expiration'] > time.time():
 #      elif msg.expiration > time.time():
 #         print '%s: Message has expired and shouldn't be processed' % func_name
+      elif job_data.has_key('JobUniverse') == True and \
+           job_data['JobUniverse'] != 5:
+         # Received a request for a job on a universe other than Vanilla(5).
+         # Send a reply message indicating this message can't be run
+         err_msg = 'ERROR: Work Request wants unsupported universe (%s).  Discarding' % str(job_data['JobUniverse'])
+         msg_props = msg.get('message_properties')
+         reply.data = ''
+         send_AMQP_msg(broker_connection, msg, msg_props, err_msg)
+         broker_connection.message_accept(RangedSet(msg.id))
+         req_socket.send(pickle.dumps(reply, 2))
+         close_socket(req_socket)
+         raise general_exception(syslog.LOG_ERR, err_msg)
       else:
          # Create the ClassAd to send to the requesting client
          msg_num = str(msg.get('message_properties').message_id)
          reply.data = 'AMQPID = "' + msg_num + '"\n'
          reply.data += 'WF_REQ_SLOT = "' + slot + '"\n'
-         reply.data += 'JobUniverse = 5\n'
+         if job_data.has_key('JobUniverse') == False:
+            reply.data += 'JobUniverse = 5\n'
 #         reply.data += 'JobLeaseDuration = 500000\n'
 #         reply.data += 'JobLeaseDuration = 3\n'
          reply.data += 'IsFeatched = TRUE\n'

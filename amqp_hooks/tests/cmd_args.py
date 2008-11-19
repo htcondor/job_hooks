@@ -61,10 +61,6 @@ def dump_queue(queue_name, session, num_msgs, to):
          print 'Body: '
          print content
          print ''
-         if content != None and content != '':
-            file = open('results.zip', 'wb')
-            file.write(content)
-            file.close()
       except Empty:
          if count < expected:
             print 'Only received %d messages but expected %d.  TEST FAILED!' % (count, expected)
@@ -124,6 +120,7 @@ def main(argv=None):
       work_headers['Arguments'] = '"5"'
       work_headers['Iwd'] = '"/tmp"'
       work_headers['Owner'] = '"someone"'
+      work_headers['JobUniverse'] = 5
       message_props = session.message_properties(application_headers=work_headers)
       message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
       message_props.message_id = str(uuid4())

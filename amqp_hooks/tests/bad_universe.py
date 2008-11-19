@@ -14,15 +14,16 @@
 #   limitations under the License.
 
 #   TEST INFORMATION:
-#   This test will verify that a job without a unique message id
-#   will be discarded and the message producer will be notified.
+#   This test will verify that it is possible to send arguments for a
+#   command.  The test should receive a 2 reponses per job, and the
+#   exit response for each job should have a duration of around
+#   5 seconds.
 
 import qpid
 import zipfile
 import sys
 import getopt
 import os
-import re
 from qpid.util import connect
 from qpid.datatypes import Message, RangedSet, uuid4
 from qpid.connection import Connection
@@ -55,16 +56,11 @@ def dump_queue(queue_name, session, num_msgs, to):
          job_data = message.get('message_properties').application_headers
          print 'Headers:'
          for header in job_data.keys():
-            print header + ': ' + job_data[header]
+            print header + ': ' + str(job_data[header])
          print ''
          print 'Body: '
          print content
          print ''
-         if re.match('.*Discard.*', content) != None:
-            print 'Found Discard message'
-         else:
-            print 'Did not find Discard message. TEST FAILED!'
-            break
       except Empty:
          if count < expected:
             print 'Only received %d messages but expected %d.  TEST FAILED!' % (count, expected)
@@ -120,12 +116,14 @@ def main(argv=None):
       session.exchange_bind(exchange=broker_info['exchange'], queue=broker_info['queue'], binding_key='grid')
 
       work_headers = {}
-      work_headers['Cmd'] = '"/bin/true"'
+      work_headers['Cmd'] = '"/bin/sleep"'
+      work_headers['Arguments'] = '"5"'
       work_headers['Iwd'] = '"/tmp"'
       work_headers['Owner'] = '"someone"'
-      work_headers['JobUniverse'] = 5
+      work_headers['JobUniverse'] = 1
       message_props = session.message_properties(application_headers=work_headers)
       message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
+      message_props.message_id = str(uuid4())
 
       delivery_props = session.delivery_properties(routing_key='grid')
       delivery_props.ttl = 10000
