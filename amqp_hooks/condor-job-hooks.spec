@@ -3,14 +3,14 @@
 Summary: Condor Job Hooks
 Name: condor-job-hooks
 Version: 1.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
-Requires: python >= 2.4
+Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks-common
 
@@ -23,6 +23,7 @@ native job delivery protocol.
 Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
 BuildRequires: python-devel
+Requires: python >= 2.3
 
 %description common
 Common functions and utilities used by MRG condor job hooks.
@@ -58,6 +59,10 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Wed Dec  3 2008  <rrati@redhat> - 1.0-3
+- Fixed python dependency issue with RHEL4
+- Fixed issues running on python 2.3
+
 * Fri Nov  4 2008  <rrati@redhat> - 1.0-2
 - Add changelog
 - Fix rpmlint issues

@@ -55,6 +55,7 @@ SOURCES/${LOWLAT_SOURCE}: carod config/carod.conf config/condor-low-latency.init
 	cp -f LICENSE-2.0.txt ${LOWLAT_DIR}
 	tar -cf ${LOWLAT_SOURCE} ${LOWLAT_DIR}
 	mv "${LOWLAT_SOURCE}" SOURCES
+	cp -f config/rhel4_init.patch SOURCES/condor-low-latency-rhel4-init.patch
 
 clean:
 	rm -rf ${RPMBUILD_DIRS} ${HOOKS_DIR} ${LOWLAT_DIR}

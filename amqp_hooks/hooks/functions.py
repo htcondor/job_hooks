@@ -120,9 +120,12 @@ def close_socket(connection):
       if any errors are encountered"""
    try:
       try:
-         connection.shutdown(socket.SHUT_RDWR)
+         # python 2.3 doesn't have SHUT_RDWR defined, so use it's value (2)
+         connection.shutdown(2)
       except Exception, error:
-         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+         print error
+         if error != None:
+            raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
    finally:
       connection.close()
 
@@ -169,7 +172,8 @@ def zip_extract(filename):
    # Loop through the archive names and extract the contents
    # Make sure to create higher level directories before creating a lower
    # level file or directory (if applicable)
-   for item in sorted(contents):
+   contents.sort()
+   for item in contents:
       if item.endswith('/'):
          # This item is all directories, so recursively create them if
          # they don't already exist
@@ -190,7 +194,7 @@ def zip_extract(filename):
 
    # Set the perserved permissions and timestamp for the extracted
    # files/directories
-   for name in sorted(contents):
+   for name in contents:
       info = zip.getinfo(name)
       file_time = time.mktime(info.date_time + (0, 0, -1))
       os.chmod(name, info.external_attr >> 16L)

@@ -34,24 +34,32 @@ import time
 import zipfile
 import sys
 import getopt
+import threading
 from qpid.util import connect
 from qpid.datatypes import Message, RangedSet, uuid4
 from qpid.connection import Connection
 from qpid.queue import Empty
 from jobhooks.functions import *
 
-def dump_queue(queue_name, session, to):
+def dump_queue(binfo, queue_name, to):
+   # Create a client and log in to it.
+   child_socket = connect(str(binfo['ip']), int(binfo['port']))
+   child_connection = Connection(sock=child_socket)
+   child_connection.start()
+   child_session = child_connection.session(str(uuid4()))
+   child_session.queue_declare(queue=queue_name, exclusive=True)
+   child_session.exchange_bind(exchange=binfo['exchange'], queue=queue_name, binding_key=queue_name)
 
    print 'Messages queue: ' + queue_name 
 
    # Create the local queue. Use the queue name as destination name
    dest = queue_name 
-   queue = session.incoming(dest)
+   queue = child_session.incoming(dest)
 
    # Subscribe the local queue to the queue on the server
-   session.message_subscribe(queue=queue_name, destination=dest, accept_mode=session.accept_mode.explicit)
-   session.message_flow(dest, session.credit_unit.message, 0xFFFFFFFF)
-   session.message_flow(dest, session.credit_unit.byte, 0xFFFFFFFF)
+   child_session.message_subscribe(queue=queue_name, destination=dest, accept_mode=child_session.accept_mode.explicit)
+   child_session.message_flow(dest, child_session.credit_unit.message, 0xFFFFFFFF)
+   child_session.message_flow(dest, child_session.credit_unit.byte, 0xFFFFFFFF)
 
    # Read responses as they come in and print to the screen.
    message = 0
@@ -71,8 +79,10 @@ def dump_queue(queue_name, session, to):
          break
 
       if message != 0:
-        session.message_accept(RangedSet(message.id))
+        child_session.message_accept(RangedSet(message.id))
 
+   child_session.close(timeout=10)
+   child_connection.close()
    return (0)
 
 def main(argv=None):
@@ -87,7 +97,7 @@ def main(argv=None):
      return(FAILURE)
 
    num_msgs = 1
-   tout = 5
+   tout = 20
    for option, arg in opts:
       if option in ('-h', '--help'):
          print 'usage: ' + os.path.basename(argv[0]) + ' [-h|--help] [-n|--num_messages <num>] [-t|--timeout <num>]'
@@ -101,53 +111,43 @@ def main(argv=None):
    broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
 
    replyTo = str(uuid4())
-   pid = os.fork()
-   if pid != 0:
-      # Create a client and log in to it.
-      parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
-      connection = Connection(sock=parent_socket)
-      connection.start()
+   receive_thread = threading.Thread(target=dump_queue, args=(broker_info, replyTo, tout))
+   receive_thread.start()
 
-      session = connection.session(str(uuid4()))
+   # Create a client and log in to it.
+   parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
+   connection = Connection(sock=parent_socket)
+   connection.start()
 
-      session.queue_declare(queue=broker_info['queue'], exclusive=False)
-      session.exchange_bind(exchange=broker_info['exchange'], queue=broker_info['queue'], binding_key='grid')
+   session = connection.session(str(uuid4()))
 
-      work_headers = {}
-      work_headers['Cmd'] = '"/bin/true"'
-      work_headers['Iwd'] = '"/tmp"'
-      work_headers['Owner'] = '"someone"'
-      message_props = session.message_properties(application_headers=work_headers)
-      message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
+   session.queue_declare(queue=broker_info['queue'], exclusive=False)
+   session.exchange_bind(exchange=broker_info['exchange'], queue=broker_info['queue'], binding_key='grid')
+
+   work_headers = {}
+   work_headers['Cmd'] = '"/bin/true"'
+   work_headers['Iwd'] = '"/tmp"'
+   work_headers['Owner'] = '"someone"'
+   message_props = session.message_properties(application_headers=work_headers)
+   message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
+   message_props.message_id = str(uuid4())
+
+   delivery_props = session.delivery_properties(routing_key='grid')
+   delivery_props.ttl = 10000
+
+   count = 0
+   time.sleep(2)
+   print 'Started sending messages: ' + str(time.time())
+   for num in range(0, num_msgs):
+      session.message_transfer(destination=broker_info['exchange'], message=Message(message_props, delivery_props, ''))
       message_props.message_id = str(uuid4())
+      count = num
+   print 'Finished sending %s messages: %s' % (str(count + 1), str(time.time()))
 
-      delivery_props = session.delivery_properties(routing_key='grid')
-      delivery_props.ttl = 10000
+   # Close the session before exiting so there are no open threads.
+   session.close(timeout=10)
+   connection.close()
 
-      count = 0
-      time.sleep(2)
-      print 'Started sending messages: ' + str(time.time())
-      for num in range(0, num_msgs):
-         session.message_transfer(destination=broker_info['exchange'], message=Message(message_props, delivery_props, ''))
-         message_props.message_id = str(uuid4())
-         count = num
-      print 'Finished sending %s messages: %s' % (str(count + 1), str(time.time()))
-      os.waitpid(pid, 0)
-
-      # Close the session before exiting so there are no open threads.
-      session.close(timeout=10)
-      connection.close()
-   else:
-      # Create a client and log in to it.
-      child_socket = connect(str(broker_info['ip']), int(broker_info['port']))
-      child_connection = Connection(sock=child_socket)
-      child_connection.start()
-      child_session = child_connection.session(str(uuid4()))
-      child_session.queue_declare(queue=replyTo, exclusive=True)
-      child_session.exchange_bind(exchange=broker_info['exchange'], queue=replyTo, binding_key=replyTo)
-      dump_queue(replyTo, child_session, tout)
-      child_session.close(timeout=10)
-      child_connection.close()
    return(SUCCESS)
 
 if __name__ == '__main__':

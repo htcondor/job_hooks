@@ -1,14 +1,15 @@
 Summary: Low Latency Scheduling
 Name: condor-low-latency
 Version: 1.0
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}.tar.gz
+Patch0: condor-low-latency-rhel4-init.patch
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
-Requires: python >= 2.4
+Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
 Requires: condor-job-hooks-common
@@ -26,6 +27,9 @@ using the AMQP protocol.
 
 %prep
 %setup -q
+%if 0%{?rhel} == 4
+%patch0 -p0 -b .rhel4
+%endif
 
 %install
 mkdir -p %{buildroot}%{_sbindir}
@@ -58,6 +62,10 @@ fi
 %_sbindir/carod
 
 %changelog
+* Wed Dec  3 2008  <rrati@redhat> - 1.0-4
+- Fixed python dependency with RHEL4
+- Fixed issues running on python 2.3
+
 * Wed Nov 19 2008  <rrati@redhat> - 1.0-3
 - Low Latency daemon is on by default
 - Daemon now appropriately handles Universe being set

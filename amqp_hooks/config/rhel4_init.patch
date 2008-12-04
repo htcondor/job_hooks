@@ -1,0 +1,29 @@
+--- config/condor-low-latency.init	2008-12-04 14:43:02.962954405 -0600
++++ config/condor-low-latency.init.el4	2008-12-04 14:42:58.788960199 -0600
+@@ -36,7 +36,7 @@
+ 
+ start() {
+     echo -n $"Starting Low-Latency daemon: "
+-    daemon --pidfile $pidfile --check $prog $prog -p $pidfile --daemon
++    daemon --check $prog $prog -p $pidfile --daemon
+     RETVAL=$?
+     echo
+     [ $RETVAL -eq 0 ] && touch $lockfile
+@@ -45,7 +45,7 @@
+ 
+ stop() {
+     echo -n $"Stopping Low-Latency daemon: "
+-    killproc -p $pidfile $prog
++    killproc $prog
+     RETVAL=$?
+     echo
+     [ $RETVAL -eq 0 ] && rm -f $lockfile
+@@ -80,7 +80,7 @@
+         fi
+         ;;
+     status)
+-        status -p $pidfile $prog
++        status $prog
+         RETVAL=$?
+         ;;
+     *)

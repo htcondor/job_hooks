@@ -265,7 +265,7 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
       print '%s called at %s' % (func_name, str(time.localtime()))
 
    # List of message headers that need special treatment
-   special = ['Owner']
+   special = ['Owner', 'HookKeyword']
 
    try:
       # Figure out the SlotID that is requesting work, and don't get any
@@ -345,6 +345,7 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
             reply.data += 'Owner = ' + str(job_data['Owner']) + '\n'
          else:
             reply.data += 'Owner = "nobody"\n'
+         reply.data += 'HookKeyword = "LOW_LATENCY_JOB"\n'
 
          # Preserve the work data was processed so it can be
          # acknowledged, expired, or released as needed

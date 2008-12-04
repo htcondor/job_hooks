@@ -1,8 +1,8 @@
 To build the installation packages, run:
 make
 
-This should create RPMs in RPMS/<arch> called low-latency, condor-job-hooks,
-and condor-job-hooks-common.   Install these RPMs.
+This should create RPMs in RPMS/<arch> called condor-low-latency,
+condor-job-hooks, and condor-job-hooks-common.   Install these RPMs.
 
 Condor (>= 7.0.2-4) will need to be configured in order to use these job
 hooks (ie the low-latency feature).  To configure condor, add the following

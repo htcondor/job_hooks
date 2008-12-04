@@ -36,18 +36,7 @@ from qpid.connection import Connection
 from qpid.queue import Empty
 from jobhooks.functions import *
 
-def dump_queue(queue_name, session, to ):
-
-   print 'Messages queue: ' + queue_name 
-
-   # Create the local queue. Use the queue name as destination name
-   dest = queue_name 
-   queue = session.incoming(dest)
-
-   # Subscribe the local queue to the queue on the server
-   session.message_subscribe(queue=queue_name, destination=dest, accept_mode=session.accept_mode.explicit)
-   session.message_flow(dest, session.credit_unit.message, 0xFFFFFFFF)
-   session.message_flow(dest, session.credit_unit.byte, 0xFFFFFFFF)
+def dump_queue(queue, ses, to):
 
    # Read responses as they come in and print to the screen.
    message = 0
@@ -62,7 +51,7 @@ def dump_queue(queue_name, session, to ):
          count = count + 1
          print 'Headers:'
          for header in job_data.keys():
-            print header + ': ' + job_data[header]
+            print header + ': ' + str(job_data[header])
          print ''
          print 'Body: '
          print content
@@ -82,7 +71,7 @@ def dump_queue(queue_name, session, to ):
          break
 
       if message != 0:
-        session.message_accept(RangedSet(message.id))
+        ses.message_accept(RangedSet(message.id))
 
    return (0)
 
@@ -92,15 +81,15 @@ def main(argv=None):
       argv = sys.argv
 
    try:
-      opts, args = getopt.getopt(argv[1:], 'hn:t:', ['help', 'timeout='])
+      opts, args = getopt.getopt(argv[1:], 'h:t:', ['help', 'timeout='])
    except getopt.GetoptError, error:
      print str(error)
      return(FAILURE)
 
-   tout = 10
+   tout = 20
    for option, arg in opts:
       if option in ('-h', '--help'):
-         print 'usage: ' + os.path.basename(argv[0]) + ' [-h|--help] [-n|--num_messages <num>] [-t|--timeout <num>]'
+         print 'usage: ' + os.path.basename(argv[0]) + ' [-h|--help] [-t|--timeout <num>]'
          return(SUCCESS)
       if option in ('-t', '--timeout'):
          tout = int(arg)
@@ -109,57 +98,58 @@ def main(argv=None):
    broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
 
    replyTo = str(uuid4())
-   pid = os.fork()
-   if pid != 0:
-      # Create a client and log in to it.
-      parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
-      connection = Connection(sock=parent_socket)
-      connection.start()
 
-      session = connection.session(str(uuid4()))
+   # Create a client and log in to it.
+   parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
+   connection = Connection(sock=parent_socket)
+   connection.start()
 
-      session.queue_declare(queue=broker_info['queue'], exclusive=False)
-      session.exchange_bind(exchange=broker_info['exchange'], queue=broker_info['queue'], binding_key='grid')
+   session = connection.session(str(uuid4()))
 
-      zip = zipfile.ZipFile('test.zip', 'w')
-      zip.write('test_run.sh')
-      zip.close()
-      archived_file = open ('test.zip', 'rb')
-      file_data = archived_file.read()
-      archived_file.close()
-      os.remove('test.zip')
+   session.queue_declare(queue=replyTo, exclusive=True)
+   session.queue_declare(queue=broker_info['queue'], exclusive=False)
+   session.exchange_bind(exchange=broker_info['exchange'], queue=broker_info['queue'], binding_key='grid')
+   session.exchange_bind(exchange=broker_info['exchange'], queue=replyTo, binding_key=replyTo)
 
-      work_headers = {}
-      work_headers['Cmd'] = '"test_run.sh"'
-      work_headers['Iwd'] = '"."'
-      work_headers['Owner'] = '"someone"'
-      work_headers['TransferOutput'] = '"output output2 output3"'
-      work_headers['JobUniverse'] = 5
-      message_props = session.message_properties(application_headers=work_headers)
-      message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
-      message_props.message_id = str(uuid4())
+   # Create the local queue. Use the queue name as destination name
+   dest = replyTo 
+   recv_queue = session.incoming(dest)
+   print 'Messages queue: ' + dest 
 
-      delivery_props = session.delivery_properties(routing_key='grid')
-      delivery_props.ttl = 10000
+   # Subscribe the local queue to the queue on the server
+   session.message_subscribe(queue=replyTo, destination=dest, accept_mode=session.accept_mode.explicit)
+   session.message_flow(dest, session.credit_unit.message, 0xFFFFFFFF)
+   session.message_flow(dest, session.credit_unit.byte, 0xFFFFFFFF)
 
-      session.message_transfer(destination=broker_info['exchange'], message=Message(message_props, delivery_props, file_data))
-      message_props.message_id = str(uuid4())
-      os.waitpid(pid, 0)
+   zip = zipfile.ZipFile('test.zip', 'w')
+   zip.write('test_run.sh')
+   zip.close()
+   archived_file = open ('test.zip', 'rb')
+   file_data = archived_file.read()
+   archived_file.close()
+   os.remove('test.zip')
 
-      # Close the session before exiting so there are no open threads.
-      session.close(timeout=10)
-      connection.close()
-   else:
-      # Create a client and log in to it.
-      child_socket = connect(str(broker_info['ip']), int(broker_info['port']))
-      child_connection = Connection(sock=child_socket)
-      child_connection.start()
-      child_session = child_connection.session(str(uuid4()))
-      child_session.queue_declare(queue=replyTo, exclusive=True)
-      child_session.exchange_bind(exchange=broker_info['exchange'], queue=replyTo, binding_key=replyTo)
-      dump_queue(replyTo, child_session, tout)
-      child_session.close(timeout=10)
-      child_connection.close()
+   work_headers = {}
+   work_headers['Cmd'] = '"test_run.sh"'
+   work_headers['Iwd'] = '"."'
+   work_headers['Owner'] = '"someone"'
+   work_headers['TransferOutput'] = '"output output2 output3"'
+   work_headers['JobUniverse'] = 5
+   message_props = session.message_properties(application_headers=work_headers)
+   message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
+   message_props.message_id = str(uuid4())
+
+   delivery_props = session.delivery_properties(routing_key='grid')
+   delivery_props.ttl = 10000
+
+   session.message_transfer(destination=broker_info['exchange'], message=Message(message_props, delivery_props, file_data))
+   message_props.message_id = str(uuid4())
+   dump_queue(recv_queue, session, tout)
+
+   # Close the session before exiting so there are no open threads.
+   session.close(timeout=10)
+   connection.close()
+
    return(SUCCESS)
 
 if __name__ == '__main__':
