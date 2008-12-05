@@ -167,13 +167,22 @@ class global_data(object):
 def shutdown_sockets(sock1, sock2, amqp_con, amqp_session):
    if sock1 != None:
       try:
-         sock1.shutdown(socket.SHUT_RDWR)
+         # python 2.3 doesn't have SHUT_WR defined, so use it's value (1)
+         sock1.shutdown(1)
+         data = sock1.recv(4096)
+         while len(data) != 0:
+            data = sock1.recv(4096)
       except:
          pass
       sock1.close()
    if sock2 != None:
       try:
-         sock2.shutdown(socket.SHUT_RDWR)
+         # python 2.3 doesn't have SHUT_WR defined, so use it's value (1)
+         sock2.send('shutdown')
+         sock2.shutdown(1)
+         data = sock2.recv(4096)
+         while len(data) != 0:
+            data = sock2.recv(4096)
       except:
          pass
       sock2.close()
@@ -710,6 +719,7 @@ def main(argv=None):
 
       # Setup the socket for communication with condor
       listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
       try:
          listen_socket.bind((server['ip'], int(server['port'])))
          listen_socket.listen(int(server['queued_connections']))

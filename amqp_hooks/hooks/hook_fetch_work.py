@@ -52,11 +52,16 @@ def main(argv=None):
          raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
 
       # Get receive the work information and print to stdout
-      reply = socket_read_all(client_socket)
+      try:
+         reply = socket_read_all(client_socket)
+      except:
+         close_socket(client_socket)
+         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
       close_socket(client_socket)
-      decoded = pickle.loads(reply)
-      if decoded.data != '':
-         print decoded.data
+      if reply != 'shutdown':
+         decoded = pickle.loads(reply)
+         if decoded.data != '':
+            print decoded.data
 
       return(SUCCESS)
 

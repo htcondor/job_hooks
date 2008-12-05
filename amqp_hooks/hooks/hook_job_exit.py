@@ -64,7 +64,11 @@ def main(argv=None):
          raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
 
       # Get acknowledgement that the exit work has completed
-      reply = socket_read_all(client_socket)
+      try:
+         reply = socket_read_all(client_socket)
+      except:
+         close_socket(client_socket)
+         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
       close_socket(client_socket)
 
       return(SUCCESS)

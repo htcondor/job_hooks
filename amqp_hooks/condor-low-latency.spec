@@ -1,7 +1,7 @@
 Summary: Low Latency Scheduling
 Name: condor-low-latency
 Version: 1.0
-Release: 4%{?dist}
+Release: 5%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -62,6 +62,9 @@ fi
 %_sbindir/carod
 
 %changelog
+* Fri Dec  5 2008  <rrati@redhat> - 1.0-5
+- Cleaned up socket close code to provide cleaner shutdown
+
 * Wed Dec  3 2008  <rrati@redhat> - 1.0-4
 - Fixed python dependency with RHEL4
 - Fixed issues running on python 2.3

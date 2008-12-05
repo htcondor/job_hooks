@@ -3,7 +3,7 @@
 Summary: Condor Job Hooks
 Name: condor-job-hooks
 Version: 1.0
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -59,6 +59,9 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Fri Dec  5 2008  <rrati@redhat> - 1.0-4
+- Cleaned up socket close code to provide cleaner shutdown
+
 * Wed Dec  3 2008  <rrati@redhat> - 1.0-3
 - Fixed python dependency issue with RHEL4
 - Fixed issues running on python 2.3

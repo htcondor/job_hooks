@@ -57,21 +57,26 @@ def main(argv=None):
          raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
 
       # Receive the reply from the prepare_job notification 
-      reply = socket_read_all(client_socket)
+      try:
+         reply = socket_read_all(client_socket)
+      except:
+         close_socket(client_socket)
+         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
       close_socket(client_socket)
-      decoded = pickle.loads(reply)
-      filename = decoded.data
+      if reply != 'shutdown':
+         decoded = pickle.loads(reply)
+         filename = decoded.data
 
-      # Extract the archive if it exists
-      if filename != '':
-         # Determine the type of archive and then extract it
-         if filename.endswith('.zip') == True:
-            zip_extract(filename)
-         elif filename.endswith('.tar.gz') == True:
-            tarball_extract(filename)
-         else:
-            raise general_exception(syslog.LOG_ERR, 'File %s is in unknown archive format.' % filename)
-         os.remove(filename)
+         # Extract the archive if it exists
+         if filename != '':
+            # Determine the type of archive and then extract it
+            if filename.endswith('.zip') == True:
+               zip_extract(filename)
+            elif filename.endswith('.tar.gz') == True:
+               tarball_extract(filename)
+            else:
+               raise general_exception(syslog.LOG_ERR, 'File %s is in unknown archive format.' % filename)
+            os.remove(filename)
 
       return(SUCCESS)
 

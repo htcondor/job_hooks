@@ -120,14 +120,20 @@ def close_socket(connection):
       if any errors are encountered"""
    try:
       try:
-         # python 2.3 doesn't have SHUT_RDWR defined, so use it's value (2)
-         connection.shutdown(2)
+         # python 2.3 doesn't have SHUT_WR defined, so use it's value (1)
+         connection.shutdown(1)
       except Exception, error:
-         print error
          if error != None:
             raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+      try:
+         data = connection.recv(4096)
+         while len(data) != 0:
+            data = connection.recv(4096)
+      except:
+         pass
    finally:
       connection.close()
+      connection = None
 
 def log_messages(exception):
    """Logs messages in the passed general_exception exception to the
