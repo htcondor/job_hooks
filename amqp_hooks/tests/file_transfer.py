@@ -133,7 +133,7 @@ def main(argv=None):
    work_headers['Cmd'] = '"test_run.sh"'
    work_headers['Iwd'] = '"."'
    work_headers['Owner'] = '"someone"'
-   work_headers['TransferOutput'] = '"output output2 output3"'
+   work_headers['TransferOutput'] = '"output,output2,output3,/etc/shadow"'
    work_headers['JobUniverse'] = 5
    message_props = session.message_properties(application_headers=work_headers)
    message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)

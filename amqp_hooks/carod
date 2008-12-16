@@ -515,7 +515,6 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
    if log == True:
       print '%s called at %s' % (func_name, str(time.localtime()))
 
-   transfer_file_attribs = ['Err', 'Out', 'TransferOutput']
    file_list = []
 
    try:
@@ -562,18 +561,28 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
             app_hdrs = ack_msg.get('message_properties').application_headers
             data = None
 
-            # Generate the list of files, starting with those in the execute
-            # directory
+            # Generate the list of files to return
             orig_cwd = os.getcwd()
             os.chdir(work_cwd)
-            file_list += os.listdir(".")
-            for attrib in transfer_file_attribs:
-               if app_hdrs.has_key(attrib) == True and \
-                  str(app_hdrs[attrib]) != '':
-                  for file in grep('^"(.*)"$', app_hdrs[attrib])[0].split(','):
-                     if file not in file_list:
-                        # Only add the file to the list if wasn't there already
-                        file_list += file
+            transfer_files = grep('^TransferOutput\s*=\s*"(.*)"$', msg.data)
+            if transfer_files != None and transfer_files[0] != None:
+               if os.path.exists('_condor_stderr') == True:
+                  file_list.append('_condor_stderr')
+               else:
+                  err_file = grep('^Err\s+=\s+"(.*)"$', msg.data)
+                  if err_file != None and err_file[0] != None:
+                     file_list.append(os.path.basename(err_file[0].rstrip()))
+               if os.path.exists('_condor_stdout') == True:
+                  file_list.append('_condor_stdout')
+               else:
+                  out_file = grep('^Out\s+=\s+"(.*)"$', msg.data)
+                  if out_file != None and out_file[0] != None:
+                     file_list.append(os.path.basename(out_file[0].rstrip()))
+               for file in transfer_files[0].split(','):
+                  if file not in file_list:
+                     file_list.append(os.path.basename(file.rstrip()))
+            else:
+               file_list = os.listdir(".")
 
             # Create an archive of the files if they exist
             filename = '%s/results.zip' % work_cwd
