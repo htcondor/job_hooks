@@ -1,7 +1,7 @@
 Summary: Low Latency Scheduling
 Name: condor-low-latency
 Version: 1.0
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -62,6 +62,11 @@ fi
 %_sbindir/carod
 
 %changelog
+* Tue Dec 16 2008  <rrati@redhat> - 1.0-6
+- If TransferOutput is set, only transfer the files listed as well as
+  stdout/stderr files if they exist
+- Only package files in the job's iwd
+
 * Fri Dec  5 2008  <rrati@redhat> - 1.0-5
 - Cleaned up socket close code to provide cleaner shutdown
 
