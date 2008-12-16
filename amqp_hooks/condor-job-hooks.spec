@@ -3,7 +3,7 @@
 Summary: Condor Job Hooks
 Name: condor-job-hooks
 Version: 1.0
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -59,6 +59,9 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Tue Dec 16 2008  <rrati@redhat> - 1.0-6
+- Rebuild to sync versions
+
 * Tue Dec 16 2008  <rrati@redhat> - 1.0-5
 - If TransferOutput is set, only transfer the files listed as well as
   stdout/stderr files if they exist
