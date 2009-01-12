@@ -35,7 +35,7 @@ pidfile=/var/run/$prog.pid
 [ "${NETWORKING}" = "no" ] && exit 1
 
 start() {
-    echo -n $"Starting Low-Latency daemon: "
+    echo -n $"Starting condor-low-latency daemon: "
     daemon --pidfile $pidfile --check $prog $prog -p $pidfile --daemon
     RETVAL=$?
     echo
@@ -44,7 +44,7 @@ start() {
 }
 
 stop() {
-    echo -n $"Stopping Low-Latency daemon: "
+    echo -n $"Stopping condor-low-latency daemon: "
     killproc -p $pidfile $prog
     RETVAL=$?
     echo
