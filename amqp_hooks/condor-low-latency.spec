@@ -1,7 +1,7 @@
 Summary: Low Latency Scheduling
 Name: condor-low-latency
 Version: 1.0
-Release: 7%{?dist}
+Release: 8%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
@@ -62,6 +62,9 @@ fi
 %_sbindir/carod
 
 %changelog
+* Thu Jan 29 2009  <rrati@redhat> - 1.0-8
+- Fix init file patch for Red Hat Enterprise Linux 4
+
 * Mon Jan 12 2009  <rrati@redhat> - 1.0-7
 - BZ474405
 
