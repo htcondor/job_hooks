@@ -1,16 +1,18 @@
 .PHONY: build condor-job-hooks condor-low-latency
 
-RPMBUILD_DIRS := BUILD RPMS SOURCES SPECS SRPMS
+RPMBUILD_DIRS := BUILD BUILDROOT RPMS SOURCES SPECS SRPMS
 
 NAME := condor-job-hooks
 HOOKS_SPEC := ${NAME}.spec
 HOOKS_VERSION := $(shell grep -i version: "${HOOKS_SPEC}" | awk '{print $$2}')
-HOOKS_SOURCE := ${NAME}-${HOOKS_VERSION}.tar.gz
+HOOKS_RELEASE := $(shell grep -i 'define rel' "${HOOKS_SPEC}" | awk '{print $$3}')
+HOOKS_SOURCE := ${NAME}-${HOOKS_VERSION}-${HOOKS_RELEASE}.tar.gz
 HOOKS_DIR := ${NAME}-${HOOKS_VERSION}
 NAME := condor-low-latency
 LOWLAT_SPEC := ${NAME}.spec
 LOWLAT_VERSION := $(shell grep -i version: "${LOWLAT_SPEC}" | awk '{print $$2}')
-LOWLAT_SOURCE := ${NAME}-${LOWLAT_VERSION}.tar.gz
+LOWLAT_RELEASE := $(shell grep -i 'define rel' "${LOWLAT_SPEC}" | awk '{print $$3}')
+LOWLAT_SOURCE := ${NAME}-${LOWLAT_VERSION}-${LOWLAT_RELEASE}.tar.gz
 LOWLAT_DIR := ${NAME}-${LOWLAT_VERSION}
 
 build: condor-job-hooks condor-low-latency

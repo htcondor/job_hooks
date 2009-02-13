@@ -1,11 +1,13 @@
+%define rel 9
+
 Summary: Low Latency Scheduling
 Name: condor-low-latency
 Version: 1.0
-Release: 8%{?dist}
+Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{version}-%{rel}.tar.gz
 Patch0: condor-low-latency-rhel4-init.patch
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -62,6 +64,9 @@ fi
 %_sbindir/carod
 
 %changelog
+* Fri Feb 13 2009  <rrati@redhat> - 1.0-9
+- Change source tarball name
+
 * Thu Jan 29 2009  <rrati@redhat> - 1.0-8
 - Fix init file patch for Red Hat Enterprise Linux 4
 
