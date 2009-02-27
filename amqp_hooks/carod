@@ -395,6 +395,12 @@ def handle_reply_fetch(msg, known_items, broker_connection, log):
          # in the exit message.  This is bad and shouldn't happen.
          raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s.' % str(message_id))
       else:
+         # Set the JobStatus appropriately
+         if msg.type == condor_wf_types.reply_claim_reject:
+            msg.data += 'JobStatus = 1'
+         else:
+            msg.data += 'JobStatus = 2'
+
          try:
             # Place the data into the appropriate headers for the
             # results message.
@@ -489,6 +495,7 @@ def handle_update_job_status(msg, known_items, broker_connection, log):
          # in the exit message.  This is bad and shouldn't happen.
          raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s' % str(message_id))
       else:
+         msg.data += 'JobStatus = 2'
          try:
             # Place the data into the appropriate headers for the
             # results message.
@@ -539,6 +546,12 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
       # Find the Current Working Directory of the originating process
       # in the message received
       work_cwd = grep('^OriginatingCWD\s*=\s*"(.+)"$', msg.data)[0]
+
+      # Set the JobStatus
+      if msg.type == condor_wf_types.exit_exit:
+         msg.data += 'JobStatus = 4'
+      else:
+         msg.data += 'JobStatus = 1'
 
       # Place the data into the appropriate headers for the
       # results message.

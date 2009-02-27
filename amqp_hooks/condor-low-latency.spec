@@ -1,4 +1,4 @@
-%define rel 9
+%define rel 10
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -64,6 +64,9 @@ fi
 %_sbindir/carod
 
 %changelog
+* Thu Feb 19 2009  <rrati@redhat> - 1.0-10
+- Set JobStatus correctly (BZ459615)
+
 * Fri Feb 13 2009  <rrati@redhat> - 1.0-9
 - Change source tarball name
 
