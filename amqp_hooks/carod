@@ -261,6 +261,8 @@ def send_AMQP_msg(connection, orig_req, msg_properties, data=None):
       connection 'connection'"""
    reply_to = orig_req.get('message_properties').reply_to
    delivery_props = connection.delivery_properties(routing_key=reply_to['routing_key'])
+   msg_properties.correlation_id = str(orig_req.get('message_properties').message_id)
+   msg_properties.message_id = str(uuid4())
    connection.message_transfer(destination=reply_to['exchange'], message=Message(msg_properties, delivery_props, data))
 
 def exit_signal_handler(signum, frame):
