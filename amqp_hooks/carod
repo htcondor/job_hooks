@@ -251,9 +251,15 @@ def parse_data_into_headers(data, session):
       filled in."""
    headers = {}
    for line in data.split('\n'):
-      found = grep('^(.+)\s*=\s*(.*)$', line)
-      if found != None:
-         headers[found[0]] = found[1]
+      found = grep('^([^=]*)\s*=\s*(.*)$', line)
+      if found != None and found[0] != None and found[1] != None:
+         key = found[0].rstrip().lstrip()
+         value = found[1].rstrip().lstrip()
+         if grep('^\d+$', value) != None:
+            value = int(value) 
+         elif grep('^[\d\.]+$', value) != None:
+            value = float(value)
+         headers[key] = value
    return(session.message_properties(application_headers=headers))
 
 def send_AMQP_msg(connection, orig_req, msg_properties, data=None):
