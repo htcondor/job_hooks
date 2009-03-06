@@ -1,4 +1,4 @@
-%define rel 10
+%define rel 11
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -64,6 +64,13 @@ fi
 %_sbindir/carod
 
 %changelog
+* Fri Mar  6 2009  <rrati@redhat> - 1.0-11
+- Removed the vanilla universe restriction (BZ489001)
+- Fixed issue with AMQP message body of None (BZ489000)
+- Fxed equal sign (=) in attribute value ending up part of the header
+- Attributes and values are trimmed (BZ489003)
+- Preserve attribute value type information (BZ488996)
+ 
 * Thu Feb 19 2009  <rrati@redhat> - 1.0-10
 - Set JobStatus correctly (BZ459615)
 
