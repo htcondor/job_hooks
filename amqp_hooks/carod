@@ -454,8 +454,10 @@ def handle_prepare_job(req_socket, reply, known_items, log):
             # Place the body of the message, which should contain an archived
             # file, into the directory for the job
             reply.data = ''
-            if saved_work.AMQP_msg.body != '':
-               # Write the archived file to disk
+            if saved_work.AMQP_msg.body != '' and \
+               saved_work.AMQP_msg.body != None:
+               # Write the message contents (which should be an archived
+               # file) to disk
                input_filename = work_cwd + '/data.zip'
                write_file(input_filename, saved_work.AMQP_msg.body)
                reply.data = input_filename
