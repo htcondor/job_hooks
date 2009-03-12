@@ -41,7 +41,7 @@ class work_data(object):
       self.__AMQP_msg__ = msg
       self.__slot__ = slot_num
       self.__access_time__ = time.time()
-      self.__access_lock__ = threading.RLock()
+      self.__access_lock__ = threading.Lock()
 
    def lock(self, wait=True):
       """Acquires the lock controlling access to the data in the object"""
@@ -83,7 +83,7 @@ class work_data(object):
 class global_data(object):
    def __init__(self):
       self.__work_list__ = {}
-      self.__access_lock__ = threading.RLock()
+      self.__access_lock__ = threading.Lock()
 
    def lock(self, wait=True):
       """Acquires the lock controlling access to the stored data"""
@@ -98,38 +98,26 @@ class global_data(object):
          general_exception if the key already exists"""
       work = work_data(AMQP_msg, slot)
       if self.__find_work__(key) == False:
-         self.lock()
          self.__work_list__.update({key:work})
-         self.unlock()
       else:
          raise general_exception(syslog.LOG_WARNING, 'Key %s already exists.' % key)
 
    def remove_work(self, key):
       """Remove work information from the list of known work items and
-         returns the work removed.  The work removed will have its lock()
-         method called, so the caller of this method must unlock the work
-         item when finished.  If the work with the specified key doesn't
+         returns the work removed.  If the work with the specified key doesn't
          exist, None is returned"""
       if self.__find_work__(key) == True:
-         self.lock()
          work = self.__work_list__[key]
-         work.lock()
          del self.__work_list__[key]
-         self.unlock()
          return(work)
       else:
          return(None)
 
    def get_work(self, key):
-      """Get work information from the list of known work items.  The
-         work removed will have its lock() method called, so the caller
-         of this method must unlock the work item when finished. If the
+      """Get work information from the list of known work items.  If the
          work with the given key doesn't exist, None is returned"""
       if self.__find_work__(key) == True:
-         self.lock()
          work = self.__work_list__[key]
-         work.lock()
-         self.unlock()
          return(work)
       else:
          return(None)
@@ -138,30 +126,20 @@ class global_data(object):
       """Returns True if the given slot is currently processing work,
          False otherwise"""
       result = False
-      self.lock()
       for work in self.__work_list__.values():
          if work.slot == slot_num:
             result = True
             break
-      self.unlock()
       return(result)
 
    def __find_work__(self, key):
       """Returns True if the desired key exists, False otherwise"""
-      self.lock()
       value = self.__work_list__.has_key(key)
-      self.unlock()
       return(value)
 
    def values(self):
       """Returns a list of work_data objects which contains all known
-         work information
-
-         Warning: This function will not prevent access to the list of
-                  stored data due to its nature of returning a list of
-                  all work_data objects currently stored.  To ensure data
-                  integrity, the caller must call the lock() and unlock()
-                  methods itself """
+         work information """
       return(self.__work_list__.values())
 
 def shutdown_sockets(sock1, sock2, amqp_con, amqp_session):
@@ -227,15 +205,6 @@ def lease_monitor(msg_list, max_lease_time, interval, broker_connection, log):
                # Release the message so it can be consumed by another process
                broker_connection.message_release(RangedSet(item.AMQP_msg.id))
 
-               # Need to unlock the item because the remove_work locks it
-               item.unlock(False)
-
-            # Need to unlock here even if the message is expired because
-            # work_data uses an RLock, which counts the number of times a
-            # thread has called the lock mechanism, and at this point lock
-            # the lock has been successfully acquired via the lock call above.
-            # This lock is irrespective of the lock released if the message
-            # has been expired
             item.unlock(False)
 
       if log == True:
@@ -289,17 +258,28 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
       if slots == None:
          syslog.syslog(syslog.LOG_ERR, 'Unable to determine SlotID for request.')
       else:
-         slot = slots[0]
+         slot = slots[0].rstrip().lstrip()
 
       if log == True:
-         print '%s: Checking if slot %s is known' % (func_name, str(slot))
+         print '%s: Checking if slot %s is doing work' % (func_name, str(slot))
+         print '%s: Acquiring global message lock for slot check %s' % (func_name, str(slot))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for slot check %s' % (func_name, str(slot))
       if known_items.slot_in_use(slot) == True:
          if log == True:
-            print '%s: known slot %s' % (func_name, str(slot))
+            print '%s: slot %s is already doing work' % (func_name, str(slot))
          reply.data = ''
          req_socket.send(pickle.dumps(reply, 2))
          close_socket(req_socket)
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for slot check %s' % (func_name, str(slot))
          return(SUCCESS)
+      known_items.unlock()
+      if log == True:
+         print '%s: slot %s is not doing work' % (func_name, str(slot))
+         print '%s: Released global message lock for slot check %s' % (func_name, str(slot))
 
       # Get the work off the AMQP work queue if it exists
       try:
@@ -354,7 +334,11 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
          # acknowledged, expired, or released as needed
          if log == True:
             print '%s: Adding msg id %s to known items' % (func_name, msg_num)
+         known_items.lock()
          known_items.add_work(msg_num, msg, slot)
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, msg_num)
    
       # Send the work to the requesting client
       req_socket.send(pickle.dumps(reply, 2))
@@ -375,10 +359,15 @@ def handle_reply_fetch(msg, known_items, broker_connection, log):
       # Find the AMQPID in the message received
       message_ids = grep('^AMQPID\s*=\s*"(.+)"$', msg.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find AMQPID in exit message')
+         raise general_exception(syslog.LOG_ERR, msg.data, '%s: Unable to find AMQPID in exit message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
+      if log == True:
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
       if msg.type == condor_wf_types.reply_claim_reject:
          saved_work = known_items.remove_work(message_id)
       else:
@@ -387,8 +376,20 @@ def handle_reply_fetch(msg, known_items, broker_connection, log):
       if saved_work == None:
          # Couldn't find the AMQP message that corresponds to the AMQPID
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s.' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored AMQP message with AMQPID "%s"' % (func_name, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+
          # Set the JobStatus appropriately
          if msg.type == condor_wf_types.reply_claim_reject:
             msg.data += 'JobStatus = 1'
@@ -402,15 +403,18 @@ def handle_reply_fetch(msg, known_items, broker_connection, log):
 
             # Send the results to the appropriate exchange
             send_AMQP_msg(broker_connection, saved_work.AMQP_msg, msg_props)
-         finally:
-            if log == True:
-               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         except:
             saved_work.unlock()
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to send reply messages for id "%s"' % (func_name, str(message_id)))
 
-      if msg.type == condor_wf_types.reply_claim_reject:
-         broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
+         if msg.type == condor_wf_types.reply_claim_reject:
+            broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
+            if log == True:
+               print '%s: Work rejected %s' % (func_name, str(message_id))
+
          if log == True:
-            print '%s: Work rejected %s' % (func_name, str(message_id))
+            print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         saved_work.unlock()
 
       return(SUCCESS)
 
@@ -418,7 +422,7 @@ def handle_reply_fetch(msg, known_items, broker_connection, log):
       log_messages(error)
       return(FAILURE)
 
-def handle_prepare_job(req_socket, reply, known_items, log):
+def handle_prepare_job(req_socket, reply, known_items, broker_connection, log):
    """Prepare the environment for the job.  This includes extracting any
       archived data sent with the job request, as well as running a
       presetup script if one exists."""
@@ -430,20 +434,36 @@ def handle_prepare_job(req_socket, reply, known_items, log):
       # Find the AMQPID in the message received
       message_ids = grep('^AMQPID\s*=\s*"(.+)"$', reply.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, reply.data, 'Unable to find AMQPID in prepare job message')
+         raise general_exception(syslog.LOG_ERR, reply.data, '%s: Unable to find AMQPID in prepare job message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
       # Find the Current Working Directory  of the originating process
       # in the message received
       work_cwd = grep('^OriginatingCWD\s*=\s*"(.+)"$', reply.data)[0]
 
+      if log == True:
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
       saved_work = known_items.get_work(message_id)
       if saved_work == None:
          # Couldn't find the AMQP message that corresponds to the AMQPID
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored AMQP message with AMQPID "%s"' % (func_name, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
          try:
             # Place the body of the message, which should contain an archived
             # file, into the directory for the job
@@ -459,10 +479,14 @@ def handle_prepare_job(req_socket, reply, known_items, log):
             # Send the information about the archive file to the requester
             req_socket.send(pickle.dumps(reply, 2))
             close_socket(req_socket)
-         finally:
-            if log == True:
-               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         except:
             saved_work.unlock()
+            broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: Error extracting message body contents for job id "%s"' % (func_name, str(message_id)))
+
+         if log == True:
+            print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         saved_work.unlock()
       return(SUCCESS)
 
    except general_exception, error:
@@ -479,18 +503,32 @@ def handle_update_job_status(msg, known_items, broker_connection, log):
       # Find the AMQPID in the message received
       message_ids = grep('^AMQPID\s*=\s*"(.+)"$', msg.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find AMQPID in exit message')
+         raise general_exception(syslog.LOG_ERR, msg.data, '%s: Unable to find AMQPID in exit message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
-      saved_work = known_items.get_work(message_id)
       if log == True:
-         print '%s: Returned from get_work for message %s' % (func_name, str(message_id))
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
+      saved_work = known_items.get_work(message_id)
       if saved_work == None:
          # Couldn't find the AMQP message that corresponds to the AMQPID
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored AMQP message with AMQPID "%s"' % (func_name, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
          msg.data += 'JobStatus = 2'
          try:
             # Place the data into the appropriate headers for the
@@ -499,10 +537,13 @@ def handle_update_job_status(msg, known_items, broker_connection, log):
 
             # Send the results to the appropriate exchange
             send_AMQP_msg(broker_connection, saved_work.AMQP_msg, msg_props)
-         finally:
-            if log == True:
-               print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         except:
             saved_work.unlock()
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to send update message for id "%s"' % (func_name, str(message_id)))
+          
+         if log == True:
+            print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         saved_work.unlock()
       return(SUCCESS)
 
    except general_exception, error:
@@ -529,15 +570,17 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
          # Verify the slot sending results is known to be in use.  If not,
          # somehow results have been send from an unknown slot.
          slot = slots[0]
+         known_items.lock()
          if known_items.slot_in_use(slot) == False:
             syslog.syslog(syslog.LOG_WARNING, 'Received exit message from unknown slot %s' % slot)
+         known_items.unlock()
 
       # Find the AMQPID in the message we received
       message_ids = grep('^AMQPID\s*=\s*"(.+)"$', msg.data)
       if message_ids == None:
-         raise general_exception(syslog.LOG_ERR, msg.data, 'Unable to find AMQPID in exit message')
+         raise general_exception(syslog.LOG_ERR, msg.data, '%s: Unable to find AMQPID in exit message' % func_name)
       else:
-         message_id = message_ids[0]
+         message_id = message_ids[0].rstrip().lstrip()
 
       # Find the Current Working Directory of the originating process
       # in the message received
@@ -555,12 +598,28 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
 
       # Retrieve the AMQP message from the list of known messages so it
       # can be acknowledged or released
+      if log == True:
+         print '%s: Acquiring global message lock for %s' % (func_name, str(message_id))
+      known_items.lock()
+      if log == True:
+         print '%s: Acquired global message lock for %s' % (func_name, str(message_id))
       saved_work = known_items.remove_work(message_id)
       if saved_work == None:
          # Couldn't find the AMQP message that corresponds to the AMQPID
          # in the exit message.  This is bad and shouldn't happen.
-         raise general_exception(syslog.LOG_ERR, 'Unable to find stored AMQP message with AMQPID %s.  Message cannot be acknowledged nor results sent!' % str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
+         raise general_exception(syslog.LOG_ERR, '%s: Unable to find stored AMQP message with AMQPID "%s".  Message cannot be acknowledged nor results sent!' % (func_name, str(message_id)))
       else:
+         if log == True:
+            print '%s: Acquiring lock for %s' % (func_name, str(message_id))
+         saved_work.lock()
+         if log == True:
+            print '%s: Acquired lock for %s' % (func_name, str(message_id))
+         known_items.unlock()
+         if log == True:
+            print '%s: Released global message lock for %s' % (func_name, str(message_id))
          try:
             # If any files were specified to be retrieved side from
             # what is created in the working directory, then create an archive
@@ -623,8 +682,14 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
                if log == True:
                   print '%s: Not normal exit: %s' % (func_name, str(msg.type))
                broker_connection.message_release(RangedSet(ack_msg.id))
-         finally:
+         except:
             saved_work.unlock()
+            broker_connection.message_release(RangedSet(ack_msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to send exit message for id "%s"' % (func_name, str(message_id)))
+
+         if log == True:
+            print '%s: Releasing lock on %s' % (func_name, str(message_id))
+         saved_work.unlock()
 
       # Send acknowledgement to the originator that exit work is complete
       req_socket.send('Completed')
@@ -716,9 +781,6 @@ def main(argv=None):
          session.queue_declare(queue=broker['queue'], exclusive=False)
          session.message_subscribe(queue=broker['queue'], destination=dest, accept_mode=session.accept_mode.explicit)
       except qpid.session.SessionException, error:
-         # No need to close the session because the session exception will
-         # handle that.
-#         raise general_exception(syslog.LOG_ERR, "AMQP Error %d: %s" % (error[0].error_code, error[0].description))
          syslog.syslog(syslog.LOG_ERR, 'Broker Connection Error %d: %s' % (error[0].error_code, error[0].description))
          if connection != None:
             connection.close()
@@ -757,7 +819,7 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.reply_claim_reject:
             child = threading.Thread(target=handle_reply_fetch, args=(condor_msg, share_data, session, debug_logging))
          elif condor_msg.type == condor_wf_types.prepare_job:
-            child = threading.Thread(target=handle_prepare_job, args=(sock, condor_msg, share_data, debug_logging))
+            child = threading.Thread(target=handle_prepare_job, args=(sock, condor_msg, share_data, sesion, debug_logging))
 #         elif condor_msg.type == condor_wf_types.evict_claim:
 #            child = threading.Thread(target=handle_evict_claim, args=(condor_msg, share_data, session, debug_logging))
          elif condor_msg.type == condor_wf_types.update_job_status:
