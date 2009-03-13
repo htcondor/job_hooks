@@ -1,4 +1,4 @@
-%define rel 11
+%define rel 12
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -64,6 +64,12 @@ fi
 %_sbindir/carod
 
 %changelog
+* Fri Mar 13 2009  <rrati@redhat> - 1.0-12
+- Fixed deadlocking issues (BZ489874)
+- Fixed problems sending results message (BZ489880)
+- Fixed exception cases that would result in the message not getting
+  released for reprocessing
+
 * Fri Mar  6 2009  <rrati@redhat> - 1.0-11
 - Removed the vanilla universe restriction (BZ489001)
 - Fixed issue with AMQP message body of None (BZ489000)
