@@ -335,7 +335,12 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
          if log == True:
             print '%s: Adding msg id %s to known items' % (func_name, msg_num)
          known_items.lock()
-         known_items.add_work(msg_num, msg, slot)
+         try:
+            known_items.add_work(msg_num, msg, slot)
+         except general_exception, error:
+            known_items.unlock()
+            broker_connection.message_release(RangedSet(msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: %s' % (func_name, error.msgs))
          known_items.unlock()
          if log == True:
             print '%s: Released global message lock for %s' % (func_name, msg_num)
@@ -481,6 +486,7 @@ def handle_prepare_job(req_socket, reply, known_items, broker_connection, log):
             close_socket(req_socket)
          except:
             saved_work.unlock()
+            known_items.remove_work(message_id)
             broker_connection.message_release(RangedSet(saved_work.AMQP_msg.id))
             raise general_exception(syslog.LOG_ERR, '%s: Error extracting message body contents for job id "%s"' % (func_name, str(message_id)))
 
@@ -620,17 +626,21 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
          known_items.unlock()
          if log == True:
             print '%s: Released global message lock for %s' % (func_name, str(message_id))
-         try:
-            # If any files were specified to be retrieved side from
-            # what is created in the working directory, then create an archive
-            # of the files (if they exist) and place it in the body of the
-            # results message
-            ack_msg = saved_work.AMQP_msg
-            app_hdrs = ack_msg.get('message_properties').application_headers
-            data = None
+         # If any files were specified to be retrieved side from
+         # what is created in the working directory, then create an archive
+         # of the files (if they exist) and place it in the body of the
+         # results message
+         ack_msg = saved_work.AMQP_msg
+         app_hdrs = ack_msg.get('message_properties').application_headers
+         data = None
 
-            # Generate the list of files to return
-            orig_cwd = os.getcwd()
+         # Generate the list of files to return
+         if os.path.exists(work_cwd) == False:
+            saved_work.unlock()
+            broker_connection.message_release(RangedSet(ack_msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to change to exe dir "%s" for id "%s"' % (func_name, work_cwd, str(message_id)))
+               
+         try:
             os.chdir(work_cwd)
             transfer_files = grep('^TransferOutput\s*=\s*"(.*)"$', msg.data)
             if transfer_files != None and transfer_files[0] != None:
@@ -651,23 +661,49 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
                      file_list.append(os.path.basename(file.rstrip()))
             else:
                file_list = os.listdir(".")
+         except:
+            saved_work.unlock()
+            broker_connection.message_release(RangedSet(ack_msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to create list of files for results archive for id "%s"' % (func_name, str(message_id)))
 
-            # Create an archive of the files if they exist
-            filename = '%s/results.zip' % work_cwd
+         # Create an archive of the files if they exist
+         filename = '%s/results.zip' % work_cwd
+         try:
             zip = zipfile.ZipFile(filename, 'w')
-            for result_file in file_list:
-               if os.path.exists(result_file) == True:
+         except:
+            saved_work.unlock()
+            broker_connection.message_release(RangedSet(ack_msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to open archive file for writing for id "%s"' % (func_name, str(message_id)))
+         
+         for result_file in file_list:
+            if os.path.exists(result_file) == True:
+               try:
                   zip.write(result_file)
+               except:
+                  saved_work.unlock()
+                  broker_connection.message_release(RangedSet(ack_msg.id))
+                  raise general_exception(syslog.LOG_ERR, '%s: Failed to write "%s" to archive for id "%s"' % (func_name, result_file, str(message_id)))
+                  
+         try:
             zip.close()
             archived_file = open(filename, 'rb')
             data = archived_file.read()
             archived_file.close()
-            os.chdir(orig_cwd)
             os.remove(filename)
+         except:
+            saved_work.unlock()
+            broker_connection.message_release(RangedSet(ack_msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: Failed to write archive to disk for id "%s"' % (func_name, str(message_id)))
 
+         try:
             # Send the results to the appropriate exchange
             send_AMQP_msg(broker_connection, ack_msg, msg_props, data)
+         except:
+            saved_work.unlock()
+            broker_connection.message_release(RangedSet(ack_msg.id))
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to send exit message for id "%s"' % (func_name, str(message_id)))
 
+         try:
             if msg.type == condor_wf_types.exit_exit:
                # Job exited normally, so grab the result files, transfer the
                # results to the specified AMQP reply_to queue, and ackowledge
@@ -685,7 +721,7 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
          except:
             saved_work.unlock()
             broker_connection.message_release(RangedSet(ack_msg.id))
-            raise general_exception(syslog.LOG_ERR, '%s: Unable to send exit message for id "%s"' % (func_name, str(message_id)))
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to remove/release id "%s" on the broker' % (func_name, str(message_id)))
 
          if log == True:
             print '%s: Releasing lock on %s' % (func_name, str(message_id))
@@ -819,9 +855,7 @@ def main(argv=None):
               condor_msg.type == condor_wf_types.reply_claim_reject:
             child = threading.Thread(target=handle_reply_fetch, args=(condor_msg, share_data, session, debug_logging))
          elif condor_msg.type == condor_wf_types.prepare_job:
-            child = threading.Thread(target=handle_prepare_job, args=(sock, condor_msg, share_data, sesion, debug_logging))
-#         elif condor_msg.type == condor_wf_types.evict_claim:
-#            child = threading.Thread(target=handle_evict_claim, args=(condor_msg, share_data, session, debug_logging))
+            child = threading.Thread(target=handle_prepare_job, args=(sock, condor_msg, share_data, session, debug_logging))
          elif condor_msg.type == condor_wf_types.update_job_status:
             child = threading.Thread(target=handle_update_job_status, args=(condor_msg, share_data, session, debug_logging))
          elif condor_msg.type == condor_wf_types.exit_exit or \
