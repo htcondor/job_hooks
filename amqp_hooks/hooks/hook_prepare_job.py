@@ -59,9 +59,9 @@ def main(argv=None):
       # Receive the reply from the prepare_job notification 
       try:
          reply = socket_read_all(client_socket)
-      except:
+      except general_exception, error:
          close_socket(client_socket)
-         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+         raise general_exception(syslog.LOG_ERR, error.msgs)
       close_socket(client_socket)
       if reply != 'shutdown':
          decoded = pickle.loads(reply)
