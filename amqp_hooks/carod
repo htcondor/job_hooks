@@ -262,7 +262,7 @@ def send_AMQP_msg(connection, orig_req, msg_properties, data=None):
    reply_to = orig_req.get('message_properties').reply_to
    delivery_props = connection.delivery_properties(routing_key=reply_to['routing_key'])
    msg_properties.correlation_id = str(orig_req.get('message_properties').message_id)
-   msg_properties.message_id = str(uuid4())
+   msg_properties.message_id = uuid4()
    connection.message_transfer(destination=reply_to['exchange'], message=Message(msg_properties, delivery_props, data))
 
 def exit_signal_handler(signum, frame):
@@ -343,8 +343,8 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, broker_connectio
       else:
          # Create the ClassAd to send to the requesting client
          msg_num = str(msg.get('message_properties').message_id)
-         reply.data = 'AMQPID = "' + msg_num + '"\n'
-         reply.data += 'WF_REQ_SLOT = "' + slot + '"\n'
+         reply.data = 'AMQPID = "%s"\n' % msg_num
+         reply.data += 'WF_REQ_SLOT = "%s"\n' % slot
          if job_data.has_key('JobUniverse') == False:
             reply.data += 'JobUniverse = 5\n'
 #         reply.data += 'JobLeaseDuration = 500000\n'
