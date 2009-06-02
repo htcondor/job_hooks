@@ -49,6 +49,8 @@ def dump_queue(queue, ses, to):
          content = message.body
          job_data = message.get('message_properties').application_headers
          count = count + 1
+         print 'Reply Message ID: ' + str(message.get('message_properties').message_id)
+         print 'Correlation ID: ' + str(message.get('message_properties').correlation_id)
          print 'Headers:'
          for header in job_data.keys():
             print header + ': ' + str(job_data[header])
@@ -132,12 +134,13 @@ def main(argv=None):
    work_headers = {}
    work_headers['Cmd'] = '"test_run.sh"'
    work_headers['Iwd'] = '"."'
-   work_headers['Owner'] = '"someone"'
+   work_headers['Owner'] = '"nobody"'
    work_headers['TransferOutput'] = '"output,output2,output3,/etc/shadow"'
    work_headers['JobUniverse'] = 5
    message_props = session.message_properties(application_headers=work_headers)
    message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
-   message_props.message_id = str(uuid4())
+   message_props.message_id = uuid4()
+   print 'Job Request Message ID: %s' % str(message_props.message_id)
 
    delivery_props = session.delivery_properties(routing_key='grid')
    delivery_props.ttl = 10000
