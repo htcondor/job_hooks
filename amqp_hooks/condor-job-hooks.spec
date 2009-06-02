@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 5
+%define rel 6
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -60,6 +60,10 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Tue Jun  2 2009  <rrati@redhat> - 1.0-6
+- Fixed an exception condition in the prepare hook that wasn't handled
+  correctly
+
 * Fri Feb 13 2009  <rrati@redhat> - 1.0-5
 - Change source tarball name
 

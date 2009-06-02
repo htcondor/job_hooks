@@ -1,4 +1,4 @@
-%define rel 12
+%define rel 13
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -64,6 +64,10 @@ fi
 %_sbindir/carod
 
 %changelog
+* Tue Jun  2 2009  <rrati@redhat> - 1.0-13
+- The correlation id on response messages is set to the message id of the job
+  running
+
 * Fri Mar 13 2009  <rrati@redhat> - 1.0-12
 - Fixed deadlocking issues (BZ489874)
 - Fixed problems sending results message (BZ489880)
