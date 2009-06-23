@@ -739,6 +739,7 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
       return(FAILURE)
 
 def main(argv=None):
+   conf_file = '/etc/opt/grid/carod.conf'
    dest = 'work_requests'
    session = None
    listen_socket = None
@@ -802,10 +803,24 @@ def main(argv=None):
       signal.signal(signal.SIGTERM, exit_signal_handler)
 
       try:
-         broker = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
-         server = read_config_file('/etc/opt/grid/carod.conf', 'Daemon')
+         broker = read_condor_config('LL_BROKER', ['IP', 'PORT', 'QUEUE'])
       except config_err, error:
-         raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         syslog.syslog(syslog.LOG_INFO, *(error.msg))
+         syslog.syslog(syslog.LOG_INFO, 'Attempting to retrieve config from %s' % conf_file)
+         try:
+            broker = read_config_file(conf_file, 'Broker')
+         except config_err, error:
+            raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         
+      try:
+         server = read_condor_config('LL_DAEMON', ['IP', 'PORT', 'QUEUED_CONNECTIONS', 'LEASE_TIME', 'LEASE_CHECK_INTERVAL'])
+      except config_err, error:
+         syslog.syslog(syslog.LOG_INFO, *(error.msg))
+         syslog.syslog(syslog.LOG_INFO, 'Attempting to retrieve config from %s' % conf_file)
+         try:
+            server = read_config_file(conf_file, 'Daemon')
+         except config_err, error:
+            raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
       # Create a container to share data between threads
       share_data = global_data()

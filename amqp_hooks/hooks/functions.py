@@ -20,6 +20,7 @@ import re
 import tarfile
 import zipfile
 import time
+from subprocess import *
 from cStringIO import StringIO
 
 SUCCESS = 0
@@ -71,6 +72,24 @@ class config_err(Exception):
    def __init__(self, *str):
       print str
       self.msg = str
+
+def read_condor_config(subsys, attr_list):
+   config = {}
+   for attr in attr_list:
+      obj = Popen(['condor_config_val', '%s_%s' % (subsys, attr)], stdout=PIPE, stderr=PIPE)
+      value = obj.communicate()[0]
+      if obj.returncode == 0:
+         config['%s' % attr.lower()] = value
+      else:
+         # Try the newer <subsys>.param form
+         obj = Popen(['condor_config_val', '%s.%s' % (subsys, attr)], stdout=PIPE, stderr=PIPE)
+         value = obj.communicate()[0]
+         if obj.returncode == 0:
+            config['%s' % attr.lower()] = value
+         else:
+            # Config value not found.  This is an issue
+            raise config_err('"%s_%s" is not defined' % (subsys, attr))
+   return config
 
 def read_config_file(config_file, section):
    """Given configuration file and section names, returns a list of all value

@@ -113,8 +113,8 @@ def main(argv=None):
 
    session.queue_declare(queue=replyTo, exclusive=True)
    session.queue_declare(queue=broker_info['queue'], exclusive=False)
-   session.exchange_bind(exchange=broker_info['exchange'], queue=broker_info['queue'], binding_key='grid')
-   session.exchange_bind(exchange=broker_info['exchange'], queue=replyTo, binding_key=replyTo)
+   session.exchange_bind(exchange=amq.direct, queue=broker_info['queue'], binding_key='grid')
+   session.exchange_bind(exchange=amq.direct, queue=replyTo, binding_key=replyTo)
 
    # Create the local queue. Use the queue name as destination name
    dest = replyTo 
@@ -131,7 +131,7 @@ def main(argv=None):
    work_headers['Iwd'] = '"/tmp"'
    work_headers['JobUniverse'] = 5
    message_props = session.message_properties(application_headers=work_headers)
-   message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
+   message_props.reply_to = session.reply_to(amq.direct, replyTo)
    message_props.message_id = uuid4()
    print 'Job Request Message ID: %s' % str(message_props.message_id)
 
@@ -139,7 +139,7 @@ def main(argv=None):
    delivery_props.ttl = 10000
 
    for num in range(0, num_msgs):
-      session.message_transfer(destination=broker_info['exchange'], message=Message(message_props, delivery_props, ''))
+      session.message_transfer(destination=amq.direct, message=Message(message_props, delivery_props, ''))
       message_props.message_id = str(uuid4())
    dump_queue(recv_queue, session, num_msgs, tout)
 

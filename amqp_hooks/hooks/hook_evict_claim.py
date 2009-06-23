@@ -29,9 +29,12 @@ def main(argv=None):
 
    try:
       try:
-         config = read_config_file('/etc/opt/grid/job-hooks.conf', 'Hooks')
+         config = read_condor_config('LL_HOOKS', ['IP', 'PORT'])
       except config_err, error:
-         raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         try:
+            config = read_config_file('/etc/opt/grid/job-hooks.conf', 'Hooks')
+         except config_err, error:
+            raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
       # Create an evict claim
       request = condor_wf()

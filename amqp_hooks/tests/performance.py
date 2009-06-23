@@ -48,7 +48,7 @@ def dump_queue(binfo, queue_name, to):
    child_connection.start()
    child_session = child_connection.session(str(uuid4()))
    child_session.queue_declare(queue=queue_name, exclusive=True)
-   child_session.exchange_bind(exchange=binfo['exchange'], queue=queue_name, binding_key=queue_name)
+   child_session.exchange_bind(exchange=amq.direct, queue=queue_name, binding_key=queue_name)
 
    print 'Messages queue: ' + queue_name 
 
@@ -122,14 +122,14 @@ def main(argv=None):
    session = connection.session(str(uuid4()))
 
    session.queue_declare(queue=broker_info['queue'], exclusive=False)
-   session.exchange_bind(exchange=broker_info['exchange'], queue=broker_info['queue'], binding_key='grid')
+   session.exchange_bind(exchange=amq.direct, queue=broker_info['queue'], binding_key='grid')
 
    work_headers = {}
    work_headers['Cmd'] = '"/bin/true"'
    work_headers['Iwd'] = '"/tmp"'
    work_headers['Owner'] = '"someone"'
    message_props = session.message_properties(application_headers=work_headers)
-   message_props.reply_to = session.reply_to(broker_info['exchange'], replyTo)
+   message_props.reply_to = session.reply_to(amq.direct, replyTo)
    message_props.message_id = str(uuid4())
 
    delivery_props = session.delivery_properties(routing_key='grid')
@@ -139,7 +139,7 @@ def main(argv=None):
    time.sleep(2)
    print 'Started sending messages: ' + str(time.time())
    for num in range(0, num_msgs):
-      session.message_transfer(destination=broker_info['exchange'], message=Message(message_props, delivery_props, ''))
+      session.message_transfer(destination=amq.direct, message=Message(message_props, delivery_props, ''))
       message_props.message_id = str(uuid4())
       count = num
    print 'Finished sending %s messages: %s' % (str(count + 1), str(time.time()))
