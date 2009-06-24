@@ -8,7 +8,7 @@
 # description: carod is the low-latency schedule daemon that translates jobs
 #              between condor and the AMQP protocol.
 # processname: carod
-# config: /etc/opt/grid/carod.conf
+# config: /etc/condor/carod.conf
 # pidfile: /var/run/carod.pid
 
 ### BEGIN INIT INFO

@@ -35,14 +35,18 @@ using the AMQP protocol.
 
 %install
 mkdir -p %{buildroot}%{_sbindir}
-mkdir -p %{buildroot}/%{_sysconfdir}/opt/grid
+mkdir -p %{buildroot}/%{_sysconfdir}/condor
 mkdir -p %{buildroot}/%{_initrddir}
 cp -f carod %{buildroot}/%_sbindir
-cp -f config/carod.conf %{buildroot}/%{_sysconfdir}/opt/grid
+cp -f config/carod.conf %{buildroot}/%{_sysconfdir}/condor
 cp -f config/condor-low-latency.init %{buildroot}/%{_initrddir}/condor-low-latency
 
 %post
 /sbin/chkconfig --add condor-low-latency
+if [[ -f /etc/opt/grid/carod.conf ]]; then
+   mv -f /etc/opt/grid/carod.conf /etc/condor
+   rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
+fi
 
 %preun
 if [ $1 = 0 ]; then
@@ -58,7 +62,7 @@ fi
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
-%config(noreplace) %_sysconfdir/opt/grid/carod.conf
+%config(noreplace) %_sysconfdir/condor/carod.conf
 %defattr(0755,root,root,-)
 %_initrddir/condor-low-latency
 %_sbindir/carod

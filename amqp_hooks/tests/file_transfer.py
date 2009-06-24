@@ -97,7 +97,7 @@ def main(argv=None):
          tout = int(arg)
 
    # Read the carod config file for broker info
-   broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
+   broker_info = read_config_file('/etc/condor/carod.conf', 'Broker')
 
    replyTo = str(uuid4())
 
