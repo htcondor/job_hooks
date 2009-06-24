@@ -65,7 +65,7 @@ LL_DAEMON_LEASE_CHECK_INTERVAL:
    Desc: How often to check for lease expiration
 
 If the configuration is not found in condor's configuration files, then
-carod will look in /etc/opt/grid/carod.conf.
+carod will look in /etc/condor/carod.conf.
 
 The Condor job hooks will first look for their configuration in condor's
 configuration files.  The following parameters can be placed in a condor
@@ -81,7 +81,7 @@ LL_HOOKS_PORT:
 
 
 If the configuration is not found in condor's configuration files, then
-the job hooks will look in /etc/opt/grid/job-hooks.conf.  The ip and port
+the job hooks will look in /etc/condor/job-hooks.conf.  The ip and port
 information for the job hooks must match how carod is configured.
 
 The carod daemon is started and stopped by Condor's master daemon.
@@ -91,5 +91,5 @@ Example parameters to add to condor's configuration files can be found at:
 
 To use the low-latency feature, configure condor as mention aboved, ensure
 qpid is running, and start carod.  To submit jobs, send AMQP messages to the
-AMQP queue defined in the /etc/opt/grid/carod.conf configuration file, with
+AMQP queue defined in the /etc/condor/carod.conf configuration file, with
 the classad information stored as headers in the application_headers field.

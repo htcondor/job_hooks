@@ -28,12 +28,19 @@ using the AMQP protocol.
 mkdir -p %{buildroot}%{_sbindir}
 mkdir -p %{buildroot}/%{_sysconfdir}/opt/grid
 cp -f carod %{buildroot}/%_sbindir
-cp -f config/carod.conf %{buildroot}/%{_sysconfdir}/opt/grid
+cp -f config/carod.conf %{buildroot}/%{_sysconfdir}/condor
+
+
+%post
+if [[ -f /etc/opt/grid/carod.conf ]]; then
+   mv -f /etc/opt/grid/carod.conf /etc/condor
+   rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
+fi
 
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt ll_condor_config
-%config(noreplace) %_sysconfdir/opt/grid/carod.conf
+%config(noreplace) %_sysconfdir/condor/carod.conf
 %defattr(0755,root,root,-)
 %_sbindir/carod
 

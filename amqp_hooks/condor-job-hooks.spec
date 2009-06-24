@@ -32,20 +32,26 @@ Common functions and utilities used by MRG condor job hooks.
 %prep
 %setup -q
 
+%post
+if [[ -f /etc/opt/grid/job-hooks.conf ]]; then
+   mv -f /etc/opt/grid/job-hooks.conf /etc/condor
+   rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
+fi
+
 %install
 mkdir -p %{buildroot}/%_libexecdir/condor/hooks
 mkdir -p %{buildroot}/%{python_sitelib}/jobhooks
-mkdir -p %{buildroot}/%_sysconfdir/opt/grid
+mkdir -p %{buildroot}/%_sysconfdir/condor
 cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 rm -f %{buildroot}/%_libexecdir/condor/hooks/hook_evict_claim.*
 cp -f functions.py %{buildroot}/%{python_sitelib}/jobhooks
 touch %{buildroot}/%{python_sitelib}/jobhooks/__init__.py
-cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/opt/grid
+cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/condor
 
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
-%config(noreplace) %{_sysconfdir}/opt/grid/job-hooks.conf
+%config(noreplace) %{_sysconfdir}/condor/job-hooks.conf
 %defattr(0755,root,root,-)
 %_libexecdir/condor/hooks/hook_fetch_work.py*
 %_libexecdir/condor/hooks/hook_job_exit.py*

@@ -35,7 +35,7 @@ def main(argv=None):
          config = read_condor_config('LL_HOOKS', ['IP', 'PORT'])
       except config_err, error:
          try:
-            config = read_config_file('/etc/opt/grid/job-hooks.conf', 'Hooks')
+            config = read_config_file('/etc/condor/job-hooks.conf', 'Hooks')
          except config_err, error:
             raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 

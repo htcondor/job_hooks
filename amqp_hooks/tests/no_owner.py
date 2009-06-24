@@ -106,7 +106,7 @@ def main(argv=None):
       syslog.syslog(syslog.LOG_INFO, *(error.msg))
       syslog.syslog(syslog.LOG_INFO, 'Attempting to retrieve config from %s' % conf_file)
       try:
-         broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
+         broker_info = read_config_file('/etc/condor/carod.conf', 'Broker')
       except config_err, error:
          raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 

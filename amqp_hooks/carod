@@ -739,7 +739,7 @@ def handle_exit(req_socket, msg, known_items, broker_connection, log):
       return(FAILURE)
 
 def main(argv=None):
-   conf_file = '/etc/opt/grid/carod.conf'
+   conf_file = '/etc/condor/carod.conf'
    dest = 'work_requests'
    session = None
    listen_socket = None
