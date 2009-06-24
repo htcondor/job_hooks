@@ -21,21 +21,68 @@ SLOT1_JOB_HOOK_KEYWORD = LOW_LATENCY
 STARTD_JOB_HOOK_KEYWORD = LOW_LATENCY
 STARTER_JOB_HOOK_KEYWORD = LOW_LATENCY
 
-FetchWorkDelay = 10 * (Activity == "Idle")
+FetchWorkDelay = ifThenElse(State == "Claimed" && Activity == "Idle", 0, 10)
 STARTER_UPDATE_INTERVAL = 30
 
 For more information on Condor/Grid hooks please see:
 https://www.cs.wisc.edu/condor/manual/v7.1/4_4Job_Hooks.html
 
-The AMQP translation daemon (carod) is configured by editing the config file
-/etc/opt/grid/carod.conf.  This file controls which AMQP broker
-to talk to and all relevant options (exchange name, queue, ip, etc), as well 
-as the configuration information for caro itself.
+The AMQP translation daemon (carod) will first look for its configuration
+in condor's configuration files.  The following parameters can be placed in
+a condor configuration file to configure carod:
 
-The Condor job hooks are configured by editing the config file
-/etc/opt/grid/job-hooks.conf.  This file tells the job hooks on what port
-and IP the translation daemon can be contact.  The ip and port information
-in this file must match what carod is configured with.
+LL_BROKER_IP:
+   Type: IP Address
+   Desc: The IP address of the broker that carod should talk to
+
+LL_BROKER_PORT:
+   Type: Integer
+   Desc: The port on $(LL_BROKER_IP) the broker is listening to
+
+LL_BROKER_QUEUE:
+   Type: String
+   Desc: The queue on the broker for condor jobs
+
+LL_DAEMON_IP:
+   Type: IP Address
+   Desc: The IP address of the interface carod use for connections
+
+LL_DAEMON_PORT:
+   Type: Integer
+   Desc: The port carod should use to listen for connections
+
+LL_DAEMON_QUEUED_CONNECTIONS:
+   Type: Integer
+   Desc: The number of allowed outstanding connections
+
+LL_DAEMON_LEASE_TIME:
+   Type: Integer
+   Desc: The maximum amount of time a job is allowed to run without providing
+         an update
+
+LL_DAEMON_LEASE_CHECK_INTERVAL:
+   Type: Integer
+   Desc: How often to check for lease expiration
+
+If the configuration is not found in condor's configuration files, then
+carod will look in /etc/opt/grid/carod.conf.
+
+The Condor job hooks will first look for their configuration in condor's
+configuration files.  The following parameters can be placed in a condor
+configuration file to configure the job hooks:
+
+LL_HOOKS_IP:
+   Type: IP Address
+   Desc: The IP address where carod is listening for connections
+
+LL_HOOKS_PORT:
+   Type: Integer
+   Desc: The port carod is listening for connections
+
+
+If the configuration is not found in condor's configuration files, then
+the job hooks will look in /etc/opt/grid/job-hooks.conf.  The ip and port
+information for the job hooks must match how carod is configured.
 
 The carod daemon can be started and stopped via the init file:
 /etc/init.d/condor-low-latency
