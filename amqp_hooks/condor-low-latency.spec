@@ -8,7 +8,6 @@ License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
 Source0: %{name}-%{version}-%{rel}.tar.gz
-Patch0: condor-low-latency-rhel4-init.patch
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
@@ -17,11 +16,6 @@ Requires: condor-job-hooks
 Requires: condor-job-hooks-common
 Requires: python-qpid
 
-Requires(post):/sbin/chkconfig
-Requires(preun):/sbin/chkconfig
-Requires(preun):/sbin/service
-Requires(postun):/sbin/service
-
 %description
 Low Latency Scheduling provides a means for bypassing condor's normal
 scheduling process and instead submit work directly to an execute node
@@ -29,38 +23,18 @@ using the AMQP protocol.
 
 %prep
 %setup -q
-%if 0%{?rhel} == 4
-%patch0 -p0 -b .rhel4
-%endif
 
 %install
 mkdir -p %{buildroot}%{_sbindir}
 mkdir -p %{buildroot}/%{_sysconfdir}/opt/grid
-mkdir -p %{buildroot}/%{_initrddir}
 cp -f carod %{buildroot}/%_sbindir
 cp -f config/carod.conf %{buildroot}/%{_sysconfdir}/opt/grid
-cp -f config/condor-low-latency.init %{buildroot}/%{_initrddir}/condor-low-latency
-
-%post
-/sbin/chkconfig --add condor-low-latency
-
-%preun
-if [ $1 = 0 ]; then
-  /sbin/service condor-low-latency stop >/dev/null 2>&1 || :
-  /sbin/chkconfig --del condor-low-latency
-fi
-
-%postun
-if [ "$1" -ge "1" ]; then
-  /sbin/service condor-low-latency condrestart >/dev/null 2>&1 || :
-fi
 
 %files
 %defattr(-,root,root,-)
-%doc LICENSE-2.0.txt
+%doc LICENSE-2.0.txt ll_condor_config
 %config(noreplace) %_sysconfdir/opt/grid/carod.conf
 %defattr(0755,root,root,-)
-%_initrddir/condor-low-latency
 %_sbindir/carod
 
 %changelog

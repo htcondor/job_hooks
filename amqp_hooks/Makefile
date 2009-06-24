@@ -47,17 +47,16 @@ SOURCES/${HOOKS_SOURCE}: hooks/functions.py hooks/hook_evict_claim.py \
 	tar -cf ${HOOKS_SOURCE} ${HOOKS_DIR}
 	mv "${HOOKS_SOURCE}" SOURCES
 
-SOURCES/${LOWLAT_SOURCE}: carod config/carod.conf config/condor-low-latency.init
+SOURCES/${LOWLAT_SOURCE}: carod config/carod.conf
 	mkdir -p SOURCES
 	rm -rf ${LOWLAT_DIR}
 	mkdir ${LOWLAT_DIR}
 	mkdir ${LOWLAT_DIR}/config
 	cp -f carod ${LOWLAT_DIR}
-	cp -f config/carod.conf config/condor-low-latency.init ${LOWLAT_DIR}/config
-	cp -f LICENSE-2.0.txt ${LOWLAT_DIR}
+	cp -f config/carod.conf ${LOWLAT_DIR}/config
+	cp -f LICENSE-2.0.txt config/ll_condor_config ${LOWLAT_DIR}
 	tar -cf ${LOWLAT_SOURCE} ${LOWLAT_DIR}
 	mv "${LOWLAT_SOURCE}" SOURCES
-	cp -f config/rhel4_init.patch SOURCES/condor-low-latency-rhel4-init.patch
 
 clean:
 	rm -rf ${RPMBUILD_DIRS} ${HOOKS_DIR} ${LOWLAT_DIR}
