@@ -37,8 +37,10 @@ The Condor job hooks are configured by editing the config file
 and IP the translation daemon can be contact.  The ip and port information
 in this file must match what carod is configured with.
 
-The carod daemon can be started and stopped via the init file:
-/etc/init.d/condor-low-latency
+The carod daemon is started and stopped by Condor's master daemon.
+Example parameters to add to condor's configuration files can be found at:
+
+/usr/share/doc/condor-low-latency-1.0/ll_condor_config
 
 To use the low-latency feature, configure condor as mention aboved, ensure
 qpid is running, and start carod.  To submit jobs, send AMQP messages to the
