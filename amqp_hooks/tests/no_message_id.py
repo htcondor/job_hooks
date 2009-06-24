@@ -94,8 +94,16 @@ def main(argv=None):
       if option in ('-t', '--timeout'):
          tout = int(arg)
 
-   # Read the carod config file for broker info
-   broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
+   # Retrieve the carod config for broker info
+   try:
+      broker_info = read_condor_config('LL_BROKER', ['IP', 'PORT', 'QUEUE'])
+   except config_err, error:
+      syslog.syslog(syslog.LOG_INFO, *(error.msg))
+      syslog.syslog(syslog.LOG_INFO, 'Attempting to retrieve config from %s' % conf_file)
+      try:
+         broker_info = read_config_file('/etc/opt/grid/carod.conf', 'Broker')
+      except config_err, error:
+         raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
 
    replyTo = str(uuid4())
 
