@@ -1,4 +1,4 @@
-%define rel 13
+%define rel 14
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -26,7 +26,7 @@ using the AMQP protocol.
 
 %install
 mkdir -p %{buildroot}%{_sbindir}
-mkdir -p %{buildroot}/%{_sysconfdir}/opt/grid
+mkdir -p %{buildroot}/%{_sysconfdir}/condor
 cp -f carod %{buildroot}/%_sbindir
 cp -f config/carod.conf %{buildroot}/%{_sysconfdir}/condor
 
@@ -45,6 +45,12 @@ fi
 %_sbindir/carod
 
 %changelog
+* Wed Jun 24 2009  <rrati@redhat> - 1.0-14
+- carod will first look for its configuration in condor's configuration
+  files, then fall back to its config file
+- The config file has moved from /etc/opt/grid to /etc/condor
+- Condor should control the start/stop/restart of carod
+ 
 * Tue Jun  2 2009  <rrati@redhat> - 1.0-13
 - The correlation id on response messages is set to the message id of the job
   running

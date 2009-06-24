@@ -1,5 +1,5 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 6
+%define rel 7
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -66,6 +66,11 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/condor
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Wed Jun 24 2009  <rrati@redhat> - 1.0-7
+- Hooks will first look for their configuration in condor's configuration
+  files, then fall back to their config file
+- The config file has moved from /etc/opt/grid to /etc/condor
+
 * Tue Jun  2 2009  <rrati@redhat> - 1.0-6
 - Fixed an exception condition in the prepare hook that wasn't handled
   correctly
