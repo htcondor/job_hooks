@@ -1,4 +1,5 @@
-%define rel 14
+%{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
+%define rel 15
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -7,6 +8,9 @@ Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
+# This is a Red Hat maintained package which is specific to
+# our distribution.  Thus the source is only available from
+# within this srpm.
 Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -24,18 +28,25 @@ using the AMQP protocol.
 %prep
 %setup -q
 
+%build
+
 %install
 mkdir -p %{buildroot}%{_sbindir}
 mkdir -p %{buildroot}/%{_sysconfdir}/condor
 cp -f carod %{buildroot}/%_sbindir
 cp -f config/carod.conf %{buildroot}/%{_sysconfdir}/condor
 
-
 %post
+%if 0%{?is_fedora} == 0
 if [[ -f /etc/opt/grid/carod.conf ]]; then
    mv -f /etc/opt/grid/carod.conf /etc/condor
    rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
 fi
+%endif
+exit 0
+
+%clean
+rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
@@ -45,6 +56,9 @@ fi
 %_sbindir/carod
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-15
+- Fix rpmlint/packaging issues
+
 * Wed Jun 24 2009  <rrati@redhat> - 1.0-14
 - carod will first look for its configuration in condor's configuration
   files, then fall back to its config file

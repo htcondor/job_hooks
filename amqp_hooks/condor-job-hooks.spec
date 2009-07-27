@@ -1,5 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%define rel 7
+%{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
+%define rel 8
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -8,6 +9,9 @@ Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.redhat.com/mrg
+# This is a Red Hat maintained package which is specific to
+# our distribution.  Thus the source is only available from
+# within this srpm.
 Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -32,13 +36,10 @@ Common functions and utilities used by MRG condor job hooks.
 %prep
 %setup -q
 
-%post
-if [[ -f /etc/opt/grid/job-hooks.conf ]]; then
-   mv -f /etc/opt/grid/job-hooks.conf /etc/condor
-   rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
-fi
+%build
 
 %install
+rm -rf %{buildroot}
 mkdir -p %{buildroot}/%_libexecdir/condor/hooks
 mkdir -p %{buildroot}/%{python_sitelib}/jobhooks
 mkdir -p %{buildroot}/%_sysconfdir/condor
@@ -47,6 +48,18 @@ rm -f %{buildroot}/%_libexecdir/condor/hooks/hook_evict_claim.*
 cp -f functions.py %{buildroot}/%{python_sitelib}/jobhooks
 touch %{buildroot}/%{python_sitelib}/jobhooks/__init__.py
 cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/condor
+
+%post
+%if 0%{?is_fedora} == 0
+if [[ -f /etc/opt/grid/job-hooks.conf ]]; then
+   mv -f /etc/opt/grid/job-hooks.conf /etc/condor
+   rmdir --ignore-fail-on-non-empty -p /etc/opt/grid
+fi
+%endif
+exit 0
+
+%clean
+rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
@@ -66,6 +79,9 @@ cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/condor
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-8
+- Fix rpmlint/packaging issues
+
 * Wed Jun 24 2009  <rrati@redhat> - 1.0-7
 - Hooks will first look for their configuration in condor's configuration
   files, then fall back to their config file
