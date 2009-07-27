@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 15
+%define rel 16
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -17,7 +17,7 @@ BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
-Requires: condor-job-hooks-common
+Requires: python-condor-job-hooks-common
 Requires: python-qpid
 
 %description
@@ -56,6 +56,9 @@ rm -rf %{buildroot}
 %_sbindir/carod
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-16
+- Updated dependencies to match hooks-common rename
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-15
 - Fix rpmlint/packaging issues
 
