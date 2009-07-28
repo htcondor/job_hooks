@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 16
+%define rel 17
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -31,6 +31,7 @@ using the AMQP protocol.
 %build
 
 %install
+rm -rf %{buildroot}
 mkdir -p %{buildroot}%{_sbindir}
 mkdir -p %{buildroot}/%{_sysconfdir}/condor
 cp -f carod %{buildroot}/%_sbindir
@@ -56,6 +57,9 @@ rm -rf %{buildroot}
 %_sbindir/carod
 
 %changelog
+* Mon Jul 27 2009  <rrati@redhat> - 1.0-17
+- Clean up buildroot in install section
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-16
 - Updated dependencies to match hooks-common rename
 
