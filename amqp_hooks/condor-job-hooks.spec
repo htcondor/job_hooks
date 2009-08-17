@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 10pre1
+%define rel 10
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -80,6 +80,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Mon Aug 17 2009  <rrati@redhat> - 1.0-10
+- Minor cleanup in common functions
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-9
 - Renamed condor-job-hooks-common to python-condor-job-hooks-common to
   conform to packaging guidelines since the package installs in

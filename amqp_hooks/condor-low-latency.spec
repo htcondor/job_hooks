@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 17
+%define rel 18
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -57,6 +57,9 @@ rm -rf %{buildroot}
 %_sbindir/carod
 
 %changelog
+* Mon Aug 17 2009  <rrati@redhat> - 1.0-18
+- Handle AMQP broker restarts (BZ488998)
+
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-17
 - Clean up buildroot in install section
 
