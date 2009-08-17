@@ -292,14 +292,18 @@ def send_AMQP_msg(sess, orig_req, msg_properties, config, data=None):
          # The connection to the broker has been lost for some reason.
          # Attempt to reconnect to the broker and send the message
          time.sleep(attempts * 10)
-         connect_to_broker(config)
+         try:
+            connect_to_broker(config)
+         except general_exception:
+            pass
          sess = config.amqp_session
-#      except:
-#         # Issue sending the message to the broker
-#         raise general_exception
+      except:
+         pass
       attempts += 1
-#   if attempts >= 5:
+
+   if attempts >= 5:
       # Failed to send the results
+      raise general_exception(syslog.LOG_ERR, 'Failed to send AMQP message after %d attempts for job id %s' % (attempts, str(msg_properties.correlation_id)))
 
 def exit_signal_handler(signum, frame):
    raise exit_signal('Exit signal %s received' % signum)
@@ -351,7 +355,10 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, log):
          msg = amqp_queue.get(timeout=1)
          job_data = msg.get('message_properties').application_headers
       except qpid.session.Closed:
-         connect_to_broker(known_items)
+         try:
+            connect_to_broker(known_items)
+         except general_exception:
+            pass
          reply.data = ''
          req_socket.send(pickle.dumps(reply, 2))
          close_socket(req_socket)
@@ -363,7 +370,10 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, log):
          return(SUCCESS)
       except:
          if amqp_queue == None:
-            connect_to_broker(known_items)
+            try:
+               connect_to_broker(known_items)
+            except general_exception:
+               pass
          return(SUCCESS)
 
       reply_to = msg.get('message_properties').reply_to
@@ -378,8 +388,15 @@ def handle_get_work(req_socket, reply, amqp_queue, known_items, log):
          err_msg = 'ERROR: Work Request does not have a unique message_id and is unusable.  Discarding'
          msg_props = msg.get('message_properties')
          reply.data = ''
-         send_AMQP_msg(broker_connection, msg, msg_props, known_items, err_msg)
-         broker_connection.message_accept(RangedSet(msg.id))
+         try:
+            send_AMQP_msg(broker_connection, msg, msg_props, known_items, err_msg)
+         except general_exception, error:
+            log_messages(error)
+         
+         try:
+            broker_connection.message_accept(RangedSet(msg.id))
+         except:
+            pass
          req_socket.send(pickle.dumps(reply, 2))
          close_socket(req_socket)
          raise general_exception(syslog.LOG_ERR, err_msg)
@@ -801,13 +818,13 @@ def handle_exit(req_socket, msg, known_items, log):
          try:
             # Send the results to the appropriate exchange
             send_AMQP_msg(broker_connection, ack_msg, msg_props, known_items, data)
-         except:
+         except general_exception, error:
             saved_work.unlock()
             try:
                broker_connection.message_release(RangedSet(ack_msg.id))
             except qpid.session.SessionDetached:
                pass
-            raise general_exception(syslog.LOG_ERR, '%s: Unable to send exit message for id "%s"' % (func_name, str(message_id)))
+            raise general_exception(syslog.LOG_ERR, '%s: Unable to send exit message for id "%s": %s' % (func_name, str(message_id), error.msgs[0]))
 
          try:
             if msg.type == condor_wf_types.exit_exit:
