@@ -1,10 +1,10 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 9
+%define rel 10pre1
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
-Version: 1.0
+Version: 1
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System

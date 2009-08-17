@@ -43,12 +43,11 @@ from jobhooks.functions import *
 
 def dump_queue(binfo, queue_name, to):
    # Create a client and log in to it.
-   child_socket = connect(str(binfo['ip']), int(binfo['port']))
-   child_connection = Connection(sock=child_socket)
+   child_connection = Connection(sock=connect(str(binfo['ip']), int(binfo['port'])))
    child_connection.start()
    child_session = child_connection.session(str(uuid4()))
    child_session.queue_declare(queue=queue_name, exclusive=True)
-   child_session.exchange_bind(exchange=amq.direct, queue=queue_name, binding_key=queue_name)
+   child_session.exchange_bind(exchange='amq.direct', queue=queue_name, binding_key=queue_name)
 
    print 'Messages queue: ' + queue_name 
 
@@ -74,6 +73,28 @@ def dump_queue(binfo, queue_name, to):
       except Empty:
          print 'Received %s messages: %s' % (str(count), str(time.time() - to))
          break
+#      except qpid.session.Closed:
+#         print "Re-establishing"
+#         try:
+#            child_connection.close()
+#         except:
+#            pass
+#
+#         # Give broker time to stablize and accept connections
+#         time.sleep(2)
+#         child_connection = Connection(sock=connect(str(binfo['ip']), int(binfo['port'])))
+#         child_connection.start()
+#         child_session = child_connection.session(str(uuid4()))
+#         child_session.queue_declare(queue=queue_name, exclusive=True)
+#         child_session.exchange_bind(exchange='amq.direct', queue=queue_name, binding_key=queue_name)
+#
+#         # Create the local queue. Use the queue name as destination name
+#         queue = child_session.incoming(dest)
+#
+#         # Subscribe the local queue to the queue on the server
+#         child_session.message_subscribe(queue=queue_name, destination=dest, accept_mode=child_session.accept_mode.explicit)
+#         child_session.message_flow(dest, child_session.credit_unit.message, 0xFFFFFFFF)
+#         child_session.message_flow(dest, child_session.credit_unit.byte, 0xFFFFFFFF)
       except:
          print 'Unexpected exception!'
          break
@@ -87,6 +108,8 @@ def dump_queue(binfo, queue_name, to):
 
 def main(argv=None):
    #----- Initialization ----------------------------
+   conf_file = '/etc/condor/carod.conf'
+
    if argv is None:
       argv = sys.argv
 
@@ -111,34 +134,35 @@ def main(argv=None):
    try:
       broker_info = read_condor_config('LL_BROKER', ['IP', 'PORT', 'QUEUE'])
    except config_err, error:
-      syslog.syslog(syslog.LOG_INFO, *(error.msg))
-      syslog.syslog(syslog.LOG_INFO, 'Attempting to retrieve config from %s' % conf_file)
+      print '%s' % error.msg
+      print 'Attempting to retrieve config from %s' % conf_file
       try:
-         broker_info = read_config_file('/etc/condor/carod.conf', 'Broker')
+         broker_info = read_config_file(conf_file, 'Broker')
       except config_err, error:
-         raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         print '%s' % error.msg
+         print 'Exiting'
+         return(FAILURE)
 
    replyTo = str(uuid4())
    receive_thread = threading.Thread(target=dump_queue, args=(broker_info, replyTo, tout))
    receive_thread.start()
 
    # Create a client and log in to it.
-   parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
-   connection = Connection(sock=parent_socket)
+   connection = Connection(sock=connect(str(broker_info['ip']), int(broker_info['port'])))
    connection.start()
 
    session = connection.session(str(uuid4()))
 
-   session.queue_declare(queue=broker_info['queue'], exclusive=False)
-   session.exchange_bind(exchange=amq.direct, queue=broker_info['queue'], binding_key='grid')
+   session.queue_declare(queue=broker_info['queue'], exclusive=False, auto_delete=True)
+   session.exchange_bind(exchange='amq.direct', queue=broker_info['queue'], binding_key='grid')
 
    work_headers = {}
    work_headers['Cmd'] = '"/bin/true"'
    work_headers['Iwd'] = '"/tmp"'
    work_headers['Owner'] = '"someone"'
    message_props = session.message_properties(application_headers=work_headers)
-   message_props.reply_to = session.reply_to(amq.direct, replyTo)
-   message_props.message_id = str(uuid4())
+   message_props.reply_to = session.reply_to('amq.direct', replyTo)
+   message_props.message_id = uuid4()
 
    delivery_props = session.delivery_properties(routing_key='grid')
    delivery_props.ttl = 10000
@@ -147,14 +171,20 @@ def main(argv=None):
    time.sleep(2)
    print 'Started sending messages: ' + str(time.time())
    for num in range(0, num_msgs):
-      session.message_transfer(destination=amq.direct, message=Message(message_props, delivery_props, ''))
-      message_props.message_id = str(uuid4())
+      session.message_transfer(destination='amq.direct', message=Message(message_props, delivery_props, ''))
+      message_props.message_id = uuid4()
       count = num
    print 'Finished sending %s messages: %s' % (str(count + 1), str(time.time()))
 
    # Close the session before exiting so there are no open threads.
-   session.close(timeout=10)
-   connection.close()
+   try:
+      connection.close()
+   except:
+      pass
+   try:
+      session.close(timeout=10)
+   except:
+      pass
 
    return(SUCCESS)
 

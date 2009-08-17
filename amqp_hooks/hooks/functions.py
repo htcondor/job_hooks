@@ -70,7 +70,6 @@ class general_exception(Exception):
 # Configuration exception
 class config_err(Exception):
    def __init__(self, *str):
-      print str
       self.msg = str
 
 def read_condor_config(subsys, attr_list):
@@ -79,13 +78,13 @@ def read_condor_config(subsys, attr_list):
       obj = Popen(['condor_config_val', '%s_%s' % (subsys, attr)], stdout=PIPE, stderr=PIPE)
       value = obj.communicate()[0]
       if obj.returncode == 0:
-         config['%s' % attr.lower()] = value
+         config['%s' % attr.lower()] = value.rstrip().lstrip()
       else:
          # Try the newer <subsys>.param form
          obj = Popen(['condor_config_val', '%s.%s' % (subsys, attr)], stdout=PIPE, stderr=PIPE)
          value = obj.communicate()[0]
          if obj.returncode == 0:
-            config['%s' % attr.lower()] = value
+            config['%s' % attr.lower()] = value.rstrip().lstrip()
          else:
             # Config value not found.  This is an issue
             raise config_err('"%s_%s" is not defined' % (subsys, attr))
@@ -109,7 +108,7 @@ def read_config_file(config_file, section):
       # Take the list of lists and convert into a dictionary
       dict = {}
       for list in items:
-         dict[list[0]] = list[1]
+         dict[list[0]] = list[1].rstrip().lstrip()
       return dict
 
 def socket_read_all(sock):

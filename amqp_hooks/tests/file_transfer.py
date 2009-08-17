@@ -36,7 +36,7 @@ from qpid.connection import Connection
 from qpid.queue import Empty
 from jobhooks.functions import *
 
-def dump_queue(queue, ses, to):
+def dump_queue(queue, ses, con, to, dest, broker):
 
    # Read responses as they come in and print to the screen.
    message = 0
@@ -54,9 +54,9 @@ def dump_queue(queue, ses, to):
          print 'Headers:'
          for header in job_data.keys():
             print header + ': ' + str(job_data[header])
-         print ''
-         print 'Body: '
-         print content
+#         print ''
+#         print 'Body: '
+#         print content
          print ''
          if content != None and content != '':
             file = open('results.zip', 'wb')
@@ -68,6 +68,31 @@ def dump_queue(queue, ses, to):
          else:
             print 'Received %d messages.  Check the results.zip for verification of test.' % count
          break
+      except qpid.session.Closed:
+         try:
+            con.close()
+         except:
+            pass
+
+         # Give broker time to stablize and accept connections
+         time.sleep(2)
+         con = Connection(sock=connect(str(broker['ip']), int(broker['port'])))
+         con.start()
+
+         ses = con.session(str(uuid4()))
+
+         ses.queue_declare(queue=dest, exclusive=True)
+         ses.queue_declare(queue=broker['queue'], exclusive=False, durable=True)
+         ses.exchange_bind(exchange='amq.direct', queue=broker['queue'], binding_key='grid')
+         ses.exchange_bind(exchange='amq.direct', queue=dest, binding_key=dest)
+
+         # Create the local queue. Use the queue name as destination name
+         queue = ses.incoming(dest)
+
+         # Subscribe the local queue to the queue on the server
+         ses.message_subscribe(queue=dest, destination=dest, accept_mode=ses.accept_mode.explicit)
+         ses.message_flow(dest, ses.credit_unit.message, 0xFFFFFFFF)
+         ses.message_flow(dest, ses.credit_unit.byte, 0xFFFFFFFF)
       except:
          print 'Unexpected exception!'
          break
@@ -79,6 +104,8 @@ def dump_queue(queue, ses, to):
 
 def main(argv=None):
    #----- Initialization ----------------------------
+   conf_file = '/etc/condor/carod.conf'
+
    if argv is None:
       argv = sys.argv
 
@@ -100,26 +127,27 @@ def main(argv=None):
    try:
       broker_info = read_condor_config('LL_BROKER', ['IP', 'PORT', 'QUEUE'])
    except config_err, error:
-      syslog.syslog(syslog.LOG_INFO, *(error.msg))
-      syslog.syslog(syslog.LOG_INFO, 'Attempting to retrieve config from %s' % conf_file)
+      print '%s' % error.msg
+      print 'Attempting to retrieve config from %s' % conf_file
       try:
-         broker_info = read_config_file('/etc/condor/carod.conf', 'Broker')
+         broker_info = read_config_file(conf_file, 'Broker')
       except config_err, error:
-         raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         print '%s' % error.msg
+         print 'Exiting'
+         return(FAILURE)
 
    replyTo = str(uuid4())
 
    # Create a client and log in to it.
-   parent_socket = connect(str(broker_info['ip']), int(broker_info['port']))
-   connection = Connection(sock=parent_socket)
+   connection = Connection(sock=connect(str(broker_info['ip']), int(broker_info['port'])))
    connection.start()
 
    session = connection.session(str(uuid4()))
 
-   session.queue_declare(queue=replyTo, exclusive=True)
-   session.queue_declare(queue=broker_info['queue'], exclusive=False)
-   session.exchange_bind(exchange=amq.direct, queue=broker_info['queue'], binding_key='grid')
-   session.exchange_bind(exchange=amq.direct, queue=replyTo, binding_key=replyTo)
+   session.queue_declare(queue=replyTo, exclusive=True, auto_delete=True)
+   session.queue_declare(queue=broker_info['queue'], exclusive=False, durable="true")
+   session.exchange_bind(exchange='amq.direct', queue=broker_info['queue'], binding_key='grid')
+   session.exchange_bind(exchange='amq.direct', queue=replyTo, binding_key=replyTo)
 
    # Create the local queue. Use the queue name as destination name
    dest = replyTo 
@@ -146,20 +174,25 @@ def main(argv=None):
    work_headers['TransferOutput'] = '"output,output2,output3,/etc/shadow"'
    work_headers['JobUniverse'] = 5
    message_props = session.message_properties(application_headers=work_headers)
-   message_props.reply_to = session.reply_to(amq.direct, replyTo)
+   message_props.reply_to = session.reply_to('amq.direct', replyTo)
    message_props.message_id = uuid4()
    print 'Job Request Message ID: %s' % str(message_props.message_id)
 
-   delivery_props = session.delivery_properties(routing_key='grid')
+   delivery_props = session.delivery_properties(routing_key='grid', delivery_mode=2)
    delivery_props.ttl = 10000
 
-   session.message_transfer(destination=amq.direct, message=Message(message_props, delivery_props, file_data))
-   message_props.message_id = str(uuid4())
-   dump_queue(recv_queue, session, tout)
+   session.message_transfer(destination='amq.direct', message=Message(message_props, delivery_props, file_data))
+   dump_queue(recv_queue, session, connection, tout, dest, broker_info)
 
    # Close the session before exiting so there are no open threads.
-   session.close(timeout=10)
-   connection.close()
+   try:
+      connection.close()
+   except:
+      pass
+   try:
+      session.close(timeout=10)
+   except:
+      pass
 
    return(SUCCESS)
 
