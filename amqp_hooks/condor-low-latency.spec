@@ -59,6 +59,7 @@ rm -rf %{buildroot}
 %changelog
 * Mon Aug 17 2009  <rrati@redhat> - 1.0-18
 - Handle AMQP broker restarts (BZ488998)
+- Fixed typo that allows correct usage of --help (BZ491826)
 
 * Mon Jul 27 2009  <rrati@redhat> - 1.0-17
 - Clean up buildroot in install section
