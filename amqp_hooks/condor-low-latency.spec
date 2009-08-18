@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 18
+%define rel 19
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -58,6 +58,13 @@ rm -rf %{buildroot}
 %_sbindir/carod
 
 %changelog
+* Tue Aug 18 2009  <rrati@redhat> - 1.0-19
+- Split documentation into two files, one for carod and one for
+  the job-hooks
+- Added conflict with condor-ec2-enhanced
+- Removed ll_condor_config and pulled its contents into the INSTALL
+  documentation
+
 * Mon Aug 17 2009  <rrati@redhat> - 1.0-18
 - Handle AMQP broker restarts (BZ488998)
 - Fixed typo that allows correct usage of --help (BZ491826)

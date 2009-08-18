@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 10
+%define rel 11
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -80,6 +80,10 @@ rm -rf %{buildroot}
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Tue Aug 18 2009  <rrati@redhat> - 1.0-11
+- Split documentation into two files, one for carod and one for
+  the job-hooks
+
 * Mon Aug 17 2009  <rrati@redhat> - 1.0-10
 - Minor cleanup in common functions
 
