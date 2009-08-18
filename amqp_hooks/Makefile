@@ -44,6 +44,7 @@ SOURCES/${HOOKS_SOURCE}: hooks/functions.py hooks/hook_evict_claim.py \
 	cp -f hooks/* ${HOOKS_DIR}
 	cp -f config/job-hooks.conf ${HOOKS_DIR}/config
 	cp -f LICENSE-2.0.txt ${HOOKS_DIR}
+	cp -f INSTALL.job-hooks ${HOOKS_DIR}/INSTALL
 	tar -cf ${HOOKS_SOURCE} ${HOOKS_DIR}
 	mv "${HOOKS_SOURCE}" SOURCES
 
@@ -54,7 +55,7 @@ SOURCES/${LOWLAT_SOURCE}: carod config/carod.conf
 	mkdir ${LOWLAT_DIR}/config
 	cp -f carod ${LOWLAT_DIR}
 	cp -f config/carod.conf ${LOWLAT_DIR}/config
-	cp -f LICENSE-2.0.txt config/ll_condor_config ${LOWLAT_DIR}
+	cp -f LICENSE-2.0.txt INSTALL ${LOWLAT_DIR}
 	tar -cf ${LOWLAT_SOURCE} ${LOWLAT_DIR}
 	mv "${LOWLAT_SOURCE}" SOURCES
 

@@ -19,6 +19,7 @@ Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
 Requires: python-condor-job-hooks-common
 Requires: python-qpid
+Conflicts: condor-ec2-enhanced
 
 %description
 Low Latency Scheduling provides a means for bypassing condor's normal
@@ -51,7 +52,7 @@ rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
-%doc LICENSE-2.0.txt ll_condor_config
+%doc LICENSE-2.0.txt INSTALL
 %config(noreplace) %_sysconfdir/condor/carod.conf
 %defattr(0755,root,root,-)
 %_sbindir/carod

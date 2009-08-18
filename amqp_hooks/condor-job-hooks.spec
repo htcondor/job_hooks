@@ -64,7 +64,7 @@ rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
-%doc LICENSE-2.0.txt
+%doc LICENSE-2.0.txt INSTALL
 %config(noreplace) %{_sysconfdir}/condor/job-hooks.conf
 %defattr(0755,root,root,-)
 %_libexecdir/condor/hooks/hook_fetch_work.py*
