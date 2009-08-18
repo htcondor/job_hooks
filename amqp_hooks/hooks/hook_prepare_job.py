@@ -32,7 +32,7 @@ def main(argv=None):
 
    try:
       try:
-         config = read_condor_config('LL_HOOKS', ['IP', 'PORT'])
+         config = read_condor_config('JOB_HOOKS', ['IP', 'PORT'])
       except config_err, error:
          try:
             config = read_config_file('/etc/condor/job-hooks.conf', 'Hooks')
