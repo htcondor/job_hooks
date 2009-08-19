@@ -1,10 +1,10 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 11
+%define rel 12
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
-Version: 1
+Version: 1.0
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -80,6 +80,10 @@ rm -rf %{buildroot}
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Tue Aug 18 2009  <rrati@redhat> - 1.0-12
+- Job hooks use JOB_HOOK as keyword instead of LL_HOOK
+- Fixed version numbering
+
 * Tue Aug 18 2009  <rrati@redhat> - 1.0-11
 - Split documentation into two files, one for carod and one for
   the job-hooks
