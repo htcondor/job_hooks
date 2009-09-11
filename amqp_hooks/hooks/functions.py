@@ -20,7 +20,12 @@ import re
 import tarfile
 import zipfile
 import time
-from subprocess import *
+try:
+   from subprocess import *
+   use_popen2 = False
+except:
+   from popen2 import *
+   use_popen2 = True
 from cStringIO import StringIO
 
 SUCCESS = 0
@@ -72,18 +77,43 @@ class config_err(Exception):
    def __init__(self, *str):
       self.msg = str
 
+def run_cmd(cmd, args):
+   retcode = -1
+   std_out = ''
+   std_err = ''
+   if use_popen2 == False:
+      obj = Popen([cmd, args], stdout=PIPE, stderr=PIPE)
+      (std_out, std_err) = obj.communicate()
+      retcode = obj.returncode
+   else:
+      obj = Popen3('%s %s' % (cmd, args), True)
+      retcode = obj.wait()
+      try:
+         std_out = obj.fromchild.readlines()[0]
+         objfromchild.close()
+      except:
+         pass
+      try:
+         obj.tochild.close()
+      except:
+         pass
+      try:
+         std_err = obj.childerr.readlines()[0]
+         obj.childerr.close()
+      except:
+         pass
+   return ([retcode, std_out, std_err])
+       
 def read_condor_config(subsys, attr_list):
    config = {}
    for attr in attr_list:
-      obj = Popen(['condor_config_val', '%s_%s' % (subsys, attr)], stdout=PIPE, stderr=PIPE)
-      value = obj.communicate()[0]
-      if obj.returncode == 0:
+      (rcode, value, sterr) = run_cmd('condor_config_val', '%s_%s' % (subsys, attr))
+      if rcode == 0:
          config['%s' % attr.lower()] = value.rstrip().lstrip()
       else:
          # Try the newer <subsys>.param form
-         obj = Popen(['condor_config_val', '%s.%s' % (subsys, attr)], stdout=PIPE, stderr=PIPE)
-         value = obj.communicate()[0]
-         if obj.returncode == 0:
+         (rcode, value, sterr) = run_cmd('condor_config_val', '%s.%s' % (subsys, attr))
+         if rcode == 0:
             config['%s' % attr.lower()] = value.rstrip().lstrip()
          else:
             # Config value not found.  This is an issue
