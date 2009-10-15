@@ -153,7 +153,7 @@ def main(argv=None):
 
    work_headers = {}
    work_headers['Cmd'] = '"/bin/sleep"'
-   work_headers['Arguments'] = '"10"'
+   work_headers['Arguments'] = '"12"'
    work_headers['Iwd'] = '"/tmp"'
    work_headers['Owner'] = '"nobody"'
    work_headers['JobUniverse'] = 5
