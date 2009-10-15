@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 19
+%define rel 20
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -58,6 +58,10 @@ rm -rf %{buildroot}
 %_sbindir/carod
 
 %changelog
+* Tue Oct 15 2009  <rrati@redhat> - 1.0-20
+- Removed error message when processng a status update that would be printed
+  if carod received an update for a job it didn't know about
+
 * Tue Aug 18 2009  <rrati@redhat> - 1.0-19
 - Split documentation into two files, one for carod and one for
   the job-hooks
