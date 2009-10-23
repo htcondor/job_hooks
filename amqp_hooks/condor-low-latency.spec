@@ -1,5 +1,5 @@
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 20
+%define rel 21
 
 Summary: Low Latency Scheduling
 Name: condor-low-latency
@@ -19,7 +19,6 @@ Requires: condor >= 7.0.2-4
 Requires: condor-job-hooks
 Requires: python-condor-job-hooks-common
 Requires: python-qpid
-Conflicts: condor-ec2-enhanced
 
 %description
 Low Latency Scheduling provides a means for bypassing condor's normal
@@ -58,6 +57,9 @@ rm -rf %{buildroot}
 %_sbindir/carod
 
 %changelog
+* Fri Oct 23 2009  <rrati@redhat> - 1.0-21
+- Removed conflict with condor-ec2-enhanced
+
 * Tue Oct 15 2009  <rrati@redhat> - 1.0-20
 - Removed error message when processng a status update that would be printed
   if carod received an update for a job it didn't know about
