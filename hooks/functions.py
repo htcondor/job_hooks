@@ -86,7 +86,9 @@ def run_cmd(cmd, args):
    std_out = ''
    std_err = ''
    if use_popen2 == False:
-      obj = Popen([cmd, args], stdout=PIPE, stderr=PIPE)
+      cmd_list = [cmd]
+      cmd_list += args.split(' ')
+      obj = Popen(cmd_list, stdout=PIPE, stderr=PIPE)
       (std_out, std_err) = obj.communicate()
       retcode = obj.returncode
    else:
