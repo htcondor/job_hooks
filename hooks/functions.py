@@ -74,10 +74,14 @@ class general_exception(Exception):
 
 # Configuration exception
 class config_err(Exception):
-   def __init__(self, *str):
-      self.msg = str
+   def __init__(self, msg):
+      self.msg = msg
 
 def run_cmd(cmd, args):
+   """Runs the command specified in 'cmd' with the given 'args' using
+      either the subprocess module or the open2 module, depending on which
+      is supported.  The subprocess module is favored.  Returns
+      (return_code, stdout, stderr)"""
    retcode = -1
    std_out = ''
    std_err = ''
@@ -90,7 +94,7 @@ def run_cmd(cmd, args):
       retcode = obj.wait()
       try:
          std_out = obj.fromchild.readlines()[0]
-         objfromchild.close()
+         obj.fromchild.close()
       except:
          pass
       try:
@@ -105,18 +109,21 @@ def run_cmd(cmd, args):
    return ([retcode, std_out, std_err])
        
 def read_condor_config(subsys, attr_list):
+   """ Uses condor_config_val to look up values in condor's configuration.
+       First looks for subsys_param, then for the newer subsys.param.
+       Returns map(param, value)"""
    config = {}
    for attr in attr_list:
       (rcode, value, sterr) = run_cmd('condor_config_val', '%s_%s' % (subsys, attr))
       if rcode == 0:
-         config['%s' % attr.lower()] = value.rstrip().lstrip()
+         config[attr.lower()] = value.rstrip().lstrip()
       else:
          # Try the newer <subsys>.param form
          (rcode, value, sterr) = run_cmd('condor_config_val', '%s.%s' % (subsys, attr))
          if rcode == 0:
-            config['%s' % attr.lower()] = value.rstrip().lstrip()
+            config[attr.lower()] = value.rstrip().lstrip()
          else:
-            # Config value not found.  This is an issue
+            # Config value not found.  Raise an exception
             raise config_err('"%s_%s" is not defined' % (subsys, attr))
    return config
 
