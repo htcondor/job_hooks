@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 13
+%define rel 14
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -80,6 +80,11 @@ rm -rf %{buildroot}
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Mon Jan 26 2010  <rrati@redhat> - 1.0-14
+- Fixed handling of multiple args using Popen in run_cmd
+- Added comments to a few methods
+- Fixed type in run_cmd when using the popen2 module
+
 * Fri Sep 11 2009  <rrati@redhat> - 1.0-13
 - Use popen2 module instead of subprocess on python versions that don't
   have the subprocess module (BZ522467)
