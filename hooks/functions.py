@@ -77,7 +77,7 @@ class config_err(Exception):
    def __init__(self, msg):
       self.msg = msg
 
-def run_cmd(cmd, args):
+def run_cmd(cmd, args, environ=None):
    """Runs the command specified in 'cmd' with the given 'args' using
       either the subprocess module or the open2 module, depending on which
       is supported.  The subprocess module is favored.  Returns
@@ -85,6 +85,13 @@ def run_cmd(cmd, args):
    retcode = -1
    std_out = ''
    std_err = ''
+   if environ != None:
+      try:
+         for var in environ.keys():
+            os.environ[var] = environ[var]
+      except:
+         return ([-1, None, None])
+
    if use_popen2 == False:
       cmd_list = [cmd]
       cmd_list += args.split(' ')
@@ -108,6 +115,13 @@ def run_cmd(cmd, args):
          obj.childerr.close()
       except:
          pass
+
+   if environ != None:
+      for var in environ.keys():
+         try:
+            del os.environ[var]
+         except:
+            pass
    return ([retcode, std_out, std_err])
        
 def read_condor_config(subsys, attr_list):
