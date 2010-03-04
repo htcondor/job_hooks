@@ -1,10 +1,10 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 14
+%define rel 0.1
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
-Version: 1.0
+Version: 1.1
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -80,6 +80,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Thu Mar 04 2010  <rrati@redhat> - 1.1-0.1
+- run_cmd takes an optional 3rd arg that specifies environment vars to set
+
 * Mon Jan 26 2010  <rrati@redhat> - 1.0-14
 - Fixed handling of multiple args using Popen in run_cmd
 - Added comments to a few methods
