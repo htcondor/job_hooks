@@ -15,7 +15,6 @@
 import ConfigParser
 import os
 import socket
-import syslog
 import re
 import tarfile
 import zipfile
@@ -67,9 +66,8 @@ class condor_wf(object):
     data = property(get_data, set_data)
 
 # General failure exception
-class general_exception(Exception):
-   def __init__(self, level, *msgs):
-      self.level = level
+class GeneralError(Exception):
+   def __init__(self, *msgs):
       self.msgs = msgs
 
 # Configuration exception
@@ -122,25 +120,33 @@ def run_cmd(cmd, args, environ=None):
             del os.environ[var]
          except:
             pass
-   return ([retcode, std_out, std_err])
+   return (retcode, std_out, std_err)
        
 def read_condor_config(subsys, attr_list):
    """ Uses condor_config_val to look up values in condor's configuration.
        First looks for subsys_param, then for the newer subsys.param.
        Returns map(param, value)"""
    config = {}
-   for attr in attr_list:
-      (rcode, value, sterr) = run_cmd('condor_config_val', '%s_%s' % (subsys, attr))
+   if attr_list == []:
+      (rcode, value, stderr) = run_cmd('condor_config_val', '%s' % (subsys))
       if rcode == 0:
-         config[attr.lower()] = value.rstrip().lstrip()
+         config[subsys.lower()] = value.strip()
       else:
-         # Try the newer <subsys>.param form
-         (rcode, value, sterr) = run_cmd('condor_config_val', '%s.%s' % (subsys, attr))
+         # Config value not found.  Raise an exception
+         raise config_err('"%s" is not defined' % subsys)
+   else:
+      for attr in attr_list:
+         (rcode, value, stderr) = run_cmd('condor_config_val', '%s_%s' % (subsys, attr))
          if rcode == 0:
-            config[attr.lower()] = value.rstrip().lstrip()
+            config[attr.lower()] = value.strip()
          else:
-            # Config value not found.  Raise an exception
-            raise config_err('"%s_%s" is not defined' % (subsys, attr))
+            # Try the newer <subsys>.param form
+            (rcode, value, stderr) = run_cmd('condor_config_val', '%s.%s' % (subsys, attr))
+            if rcode == 0:
+               config[attr.lower()] = value.strip()
+            else:
+               # Config value not found.  Raise an exception
+               raise config_err('"%s_%s" is not defined' % (subsys, attr))
    return config
 
 def read_config_file(config_file, section):
@@ -161,7 +167,7 @@ def read_config_file(config_file, section):
       # Take the list of lists and convert into a dictionary
       dict = {}
       for list in items:
-         dict[list[0]] = list[1].rstrip().lstrip()
+         dict[list[0]] = list[1].strip()
       return dict
 
 def socket_read_all(sock):
@@ -181,13 +187,13 @@ def socket_read_all(sock):
    except Exception, error:
       close_socket(sock)
       if error != None:
-         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+         raise GeneralError('socket error %d: %s' % (error[0], error[1]))
    sock.settimeout(old_timeout)
    return msg
 
 def close_socket(connection):
    """Performs a shutdown and a close on the socket.  Any errors
-      are logged to the system logging service.  Raises a general_exception
+      are logged to the system logging service.  Raises a GeneralError
       if any errors are encountered"""
    try:
       try:
@@ -195,7 +201,7 @@ def close_socket(connection):
          connection.shutdown(1)
       except Exception, error:
          if error != None:
-            raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+            raise GeneralError('socket error %d: %s' % (error[0], error[1]))
       try:
          data = connection.recv(4096)
          while len(data) != 0:
@@ -206,12 +212,13 @@ def close_socket(connection):
       connection.close()
       connection = None
 
-def log_messages(exception):
-   """Logs messages in the passed general_exception exception to the
+def log_messages(level, exception, logger_name=''):
+   """Logs messages in the passed GeneralError exception to the
       system logger"""
+   logger = logging.getLogger(logger_name)
    for msg in exception.msgs:
       if (msg != ''):
-         syslog.syslog(exception.level, msg)
+         logger.log(level, msg)
 
 def write_file(filename, data):
    """Writes the given data into the given filename in pieces to account for
