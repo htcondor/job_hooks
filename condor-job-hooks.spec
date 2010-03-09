@@ -4,7 +4,7 @@
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
-Version: 1.1
+Version: 1.2
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -80,6 +80,16 @@ rm -rf %{buildroot}
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Tue Mar 09 2010  <rrati@redhat> - 1.2-0.1
+- Changed log_messages to use native logging module rather than syslog
+- Changed general_execption to GeneralError
+- Exception no longer takes a level
+- log_messages now requires a level passed to it
+- Changed run_cmd to return 3 values rather than a list of 3 values
+- Fixed read_config_config to be able to handle 1 word params (ie LOG)
+- log_messages takes an optional 3rd arg that specifies the name of a
+  logging subsystem to use.  If none is given, the base logger is used
+
 * Thu Mar 04 2010  <rrati@redhat> - 1.1-0.1
 - run_cmd takes an optional 3rd arg that specifies environment vars to set
 
