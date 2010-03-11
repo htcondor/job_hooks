@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 0.1
+%define rel 0.2
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -80,6 +80,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/jobhooks/__init__.py*
 
 %changelog
+* Thu Mar 11 2010  <rrati@redhat> - 1.2-0.2
+- Added importing of logging module into common functions
+
 * Tue Mar 09 2010  <rrati@redhat> - 1.2-0.1
 - Changed log_messages to use native logging module rather than syslog
 - Changed general_execption to GeneralError
