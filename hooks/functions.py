@@ -18,6 +18,7 @@ import socket
 import re
 import tarfile
 import zipfile
+import logging
 import time
 try:
    from subprocess import *
