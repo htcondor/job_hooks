@@ -67,12 +67,12 @@ class condor_wf(object):
     data = property(get_data, set_data)
 
 # General failure exception
-class GeneralError(Exception):
-   def __init__(self, *msgs):
-      self.msgs = msgs
+class SocketError(Exception):
+   def __init__(self, msg):
+      self.msgs = msg
 
 # Configuration exception
-class config_err(Exception):
+class ConfigError(Exception):
    def __init__(self, msg):
       self.msg = msg
 
@@ -134,7 +134,7 @@ def read_condor_config(subsys, attr_list):
          config[subsys.lower()] = value.strip()
       else:
          # Config value not found.  Raise an exception
-         raise config_err('"%s" is not defined' % subsys)
+         raise ConfigError('"%s" is not defined' % subsys)
    else:
       for attr in attr_list:
          (rcode, value, stderr) = run_cmd('condor_config_val', '%s_%s' % (subsys, attr))
@@ -147,7 +147,7 @@ def read_condor_config(subsys, attr_list):
                config[attr.lower()] = value.strip()
             else:
                # Config value not found.  Raise an exception
-               raise config_err('"%s_%s" is not defined' % (subsys, attr))
+               raise ConfigError('"%s_%s" is not defined' % (subsys, attr))
    return config
 
 def read_config_file(config_file, section):
@@ -157,13 +157,13 @@ def read_config_file(config_file, section):
 
    # Parse the config file
    if os.path.exists(config_file) == False:
-      raise config_err('%s configuration file does not exist.' % config_file)
+      raise ConfigError('%s configuration file does not exist.' % config_file)
    else:
       try:
          parser.readfp(open(config_file))
          items = parser.items(section)
       except Exception, error:
-         raise config_err('Problems reading %s.' % config_file, str(error))
+         raise ConfigError('Problems reading %s.' % config_file, str(error))
 
       # Take the list of lists and convert into a dictionary
       dict = {}
@@ -188,13 +188,13 @@ def socket_read_all(sock):
    except Exception, error:
       close_socket(sock)
       if error != None:
-         raise GeneralError('socket error %d: %s' % (error[0], error[1]))
+         raise SocketError('socket error %d: %s' % (error[0], error[1]))
    sock.settimeout(old_timeout)
    return msg
 
 def close_socket(connection):
    """Performs a shutdown and a close on the socket.  Any errors
-      are logged to the system logging service.  Raises a GeneralError
+      are logged to the system logging service.  Raises a SocketError
       if any errors are encountered"""
    try:
       try:
@@ -202,7 +202,7 @@ def close_socket(connection):
          connection.shutdown(1)
       except Exception, error:
          if error != None:
-            raise GeneralError('socket error %d: %s' % (error[0], error[1]))
+            raise SocketError('socket error %d: %s' % (error[0], error[1]))
       try:
          data = connection.recv(4096)
          while len(data) != 0:
@@ -213,11 +213,11 @@ def close_socket(connection):
       connection.close()
       connection = None
 
-def log_messages(level, exception, logger_name=''):
-   """Logs messages in the passed GeneralError exception to the
-      system logger"""
+def log_messages(level, logger_name, *msgs):
+   """Logs messages in the passed msgs to the logger with the provided
+      logger_name."""
    logger = logging.getLogger(logger_name)
-   for msg in exception.msgs:
+   for msg in msgs:
       if (msg != ''):
          logger.log(level, msg)
 
