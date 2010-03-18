@@ -1,4 +1,4 @@
-.PHONY: build condor-job-hooks condor-low-latency
+.PHONY: build condor-job-hooks
 
 RPMBUILD_DIRS := BUILD BUILDROOT RPMS SOURCES SPECS SRPMS
 
@@ -9,7 +9,7 @@ RELEASE := $(shell grep -i 'define rel' "${SPEC}" | awk '{print $$3}')
 SOURCE := ${NAME}-${VERSION}-${RELEASE}.tar.gz
 DIR := ${NAME}-${VERSION}
 
-build: condor-job-hooks condor-low-latency
+build: condor-job-hooks
 
 condor-job-hooks: SPECS/${SPEC} SOURCES/${SOURCE}
 	mkdir -p BUILD RPMS SRPMS
@@ -26,9 +26,7 @@ SOURCES/${SOURCE}: hooks/functions.py hooks/hook_evict_claim.py \
 	mkdir -p SOURCES
 	rm -rf ${DIR}
 	mkdir ${DIR}
-	mkdir ${DIR}/config
 	cp -f hooks/* ${DIR}
-	cp -f config/job-hooks.conf ${DIR}/config
 	cp -f LICENSE-2.0.txt ${DIR}
 	cp -f INSTALL ${DIR}
 	tar -cf ${SOURCE} ${DIR}

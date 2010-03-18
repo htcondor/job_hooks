@@ -11,70 +11,20 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-
-import ConfigParser
-import os
-import socket
 import re
 import tarfile
 import zipfile
 import logging
 import time
+import os
+from cStringIO import StringIO
 try:
    from subprocess import *
    use_popen2 = False
 except:
    from popen2 import *
    use_popen2 = True
-from cStringIO import StringIO
 
-SUCCESS = 0
-FAILURE = 1
-
-# Generic enumerated type
-class wf_type:
-   def __init__(self,list=[]):
-      count = 0
-      for item in list.split():
-         vars(self)[item] = count
-         count = count + 1
-
-   def __setattr__(self, name, value):
-      raise ValueError('Modifying values is not allowed')
-
-   def __delattr__(self, name):
-      raise ValueError('Deleting entries is not allowed')
-
-# The type of requests from condor to act upon
-condor_wf_types = wf_type('get_work prepare_job reply_claim_accept reply_claim_reject update_job_status exit_exit exit_remove exit_hold exit_evict')
-
-# The information about the job
-class condor_wf(object):
-    def set_type(self, thetype):
-           self.__type__ = thetype
-
-    def get_type(self):
-        return self.__type__
-
-    type = property(get_type, set_type)
-
-    def set_data(self, string):
-           self.__data__ = string
-
-    def get_data(self):
-        return self.__data__
-
-    data = property(get_data, set_data)
-
-# General failure exception
-class SocketError(Exception):
-   def __init__(self, msg):
-      self.msgs = msg
-
-# Configuration exception
-class ConfigError(Exception):
-   def __init__(self, msg):
-      self.msg = msg
 
 def run_cmd(cmd, args, environ=None):
    """Runs the command specified in 'cmd' with the given 'args' using
@@ -122,96 +72,7 @@ def run_cmd(cmd, args, environ=None):
          except:
             pass
    return (retcode, std_out, std_err)
-       
-def read_condor_config(subsys, attr_list):
-   """ Uses condor_config_val to look up values in condor's configuration.
-       First looks for subsys_param, then for the newer subsys.param.
-       Returns map(param, value)"""
-   config = {}
-   if attr_list == []:
-      (rcode, value, stderr) = run_cmd('condor_config_val', '%s' % (subsys))
-      if rcode == 0:
-         config[subsys.lower()] = value.strip()
-      else:
-         # Config value not found.  Raise an exception
-         raise ConfigError('"%s" is not defined' % subsys)
-   else:
-      for attr in attr_list:
-         (rcode, value, stderr) = run_cmd('condor_config_val', '%s_%s' % (subsys, attr))
-         if rcode == 0:
-            config[attr.lower()] = value.strip()
-         else:
-            # Try the newer <subsys>.param form
-            (rcode, value, stderr) = run_cmd('condor_config_val', '%s.%s' % (subsys, attr))
-            if rcode == 0:
-               config[attr.lower()] = value.strip()
-            else:
-               # Config value not found.  Raise an exception
-               raise ConfigError('"%s_%s" is not defined' % (subsys, attr))
-   return config
 
-def read_config_file(config_file, section):
-   """Given configuration file and section names, returns a list of all value
-     	 pairs in the config file as a dictionary"""
-   parser = ConfigParser.ConfigParser()
-
-   # Parse the config file
-   if os.path.exists(config_file) == False:
-      raise ConfigError('%s configuration file does not exist.' % config_file)
-   else:
-      try:
-         parser.readfp(open(config_file))
-         items = parser.items(section)
-      except Exception, error:
-         raise ConfigError('Problems reading %s.' % config_file, str(error))
-
-      # Take the list of lists and convert into a dictionary
-      dict = {}
-      for list in items:
-         dict[list[0]] = list[1].strip()
-      return dict
-
-def socket_read_all(sock):
-   """Read all data waiting to be read on the given socket.  The first attempt
-      to read will be a blocking call, and all subsequent reads will be
-      non-blocking."""
-   msg = ''
-   old_timeout = sock.gettimeout()
-   data = sock.recv(1024)
-   sock.settimeout(0.1)
-   try:
-      while len(data) != 0:
-         msg += data
-         data = sock.recv(1024)
-   except socket.timeout, timeout:
-      pass
-   except Exception, error:
-      close_socket(sock)
-      if error != None:
-         raise SocketError('socket error %d: %s' % (error[0], error[1]))
-   sock.settimeout(old_timeout)
-   return msg
-
-def close_socket(connection):
-   """Performs a shutdown and a close on the socket.  Any errors
-      are logged to the system logging service.  Raises a SocketError
-      if any errors are encountered"""
-   try:
-      try:
-         # python 2.3 doesn't have SHUT_WR defined, so use it's value (1)
-         connection.shutdown(1)
-      except Exception, error:
-         if error != None:
-            raise SocketError('socket error %d: %s' % (error[0], error[1]))
-      try:
-         data = connection.recv(4096)
-         while len(data) != 0:
-            data = connection.recv(4096)
-      except:
-         pass
-   finally:
-      connection.close()
-      connection = None
 
 def log_messages(level, logger_name, *msgs):
    """Logs messages in the passed msgs to the logger with the provided
@@ -220,6 +81,7 @@ def log_messages(level, logger_name, *msgs):
    for msg in msgs:
       if (msg != ''):
          logger.log(level, msg)
+
 
 def write_file(filename, data):
    """Writes the given data into the given filename in pieces to account for
@@ -234,6 +96,7 @@ def write_file(filename, data):
    file_ptr.flush()
    file_ptr.close()
 
+
 def grep(pattern, data):
    """Returns the first instance found of pattern in data.  If pattern
       doesn't exist in data, None is returned.  If data contains groups,
@@ -247,6 +110,7 @@ def grep(pattern, data):
    else:
       found = match
    return(found)
+
 
 def zip_extract(filename):
    """Unzips the contents of the filename given, preserving permissions and
@@ -284,6 +148,7 @@ def zip_extract(filename):
       file_time = time.mktime(info.date_time + (0, 0, -1))
       os.chmod(name, info.external_attr >> 16L)
       os.utime(name, (file_time, file_time))
+
 
 def tarball_extract(filename):
    """Extracts the tarball (.tar.gz) given"""

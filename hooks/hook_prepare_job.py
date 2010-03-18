@@ -16,76 +16,118 @@
 import socket
 import pickle
 import sys
-import time
 import os
-import zipfile
-import syslog
-import tarfile
-from jobhooks.functions import *
+import logging
+import logging.handlers
+from condorutils.workfetch import *
+from condorutils.socketutil import *
+from condorutils.osutil import *
+from condorutils.readconfig import *
+
 
 def main(argv=None):
    if argv is None:
       argv = sys.argv
 
-   # Open a connection to the system logger
-   syslog.openlog(os.path.basename(argv[0]))
+   size = {}
+   log_name = os.path.basename(argv[0])
 
    try:
+      config = read_condor_config('JOB_HOOKS', ['IP', 'PORT', 'LOG'])
+   except ConfigError, error:
       try:
-         config = read_condor_config('JOB_HOOKS', ['IP', 'PORT'])
-      except config_err, error:
-         try:
-            config = read_config_file('/etc/condor/job-hooks.conf', 'Hooks')
-         except config_err, error:
-            raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         print >> sys.stderr, 'Warning: %s' % error.msg
+         print >> sys.stderr, 'Attemping to read config from "/etc/condor/job-hooks.conf"'
+         config = read_config_file('/etc/condor/job-hooks.conf', 'Hooks')
+      except ConfigError, error:
+         print >> sys.stderr, 'Error: %s. Exiting' % error.msg
+         return(FAILURE)
 
-      # Create a prepare_job notification
-      request = condor_wf()
-      request.type = condor_wf_types.prepare_job
+   try:
+      size = read_condor_config('MAX_JOB_HOOKS', ['LOG'])
+   except:
+      size['log'] = 1000000
 
-      # Store the ClassAd from STDIN in the data portion of the message
-      cwd = os.getcwd()
-      request.data = ''
-      for line in sys.stdin:
-         request.data = request.data + str(line)
-      request.data = request.data + 'OriginatingCWD = "' + cwd + '"\n'
+   base_logger = logging.getLogger(log_name)
+   hndlr = logging.handlers.RotatingFileHandler(filename='%s.prepare' % config['log'],
+                                                mode='a',
+                                                maxBytes=int(size['log']),
+                                                backupCount=1)
+   hndlr.setLevel(logging.INFO)
+   base_logger.setLevel(logging.INFO)
+   fmtr = logging.Formatter('%(asctime)s %(levelname)s:%(message)s',
+                            '%m/%d %H:%M:%S')
+   hndlr.setFormatter(fmtr)
+   base_logger.addHandler(hndlr)
 
-      # Send the message
-      client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   # Create a prepare_job notification
+   request = condor_wf()
+   request.type = condor_wf_types.prepare_job
+
+   # Store the ClassAd from STDIN in the data portion of the message
+   cwd = os.getcwd()
+   request.data = ''
+   for line in sys.stdin:
+      request.data = request.data + str(line)
+   request.data = request.data + 'OriginatingCWD = "' + cwd + '"\n'
+
+   # Send the message
+   client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   try:
+      client_socket.connect((config['ip'], int(config['port'])))
+      client_socket.send(pickle.dumps(request, 2))
+   except Exception, error:
       try:
-         client_socket.connect((config['ip'], int(config['port'])))
-         client_socket.send (pickle.dumps(request, 2))
-      except Exception, error:
          close_socket(client_socket)
-         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
-
-      # Receive the reply from the prepare_job notification 
-      try:
-         reply = socket_read_all(client_socket)
-      except general_exception, error:
-         close_socket(client_socket)
-         raise general_exception(syslog.LOG_ERR, error.msgs)
-      close_socket(client_socket)
-      if reply != 'shutdown':
-         decoded = pickle.loads(reply)
-         filename = decoded.data
-
-         # Extract the archive if it exists
-         if filename != '':
-            # Determine the type of archive and then extract it
-            if filename.endswith('.zip') == True:
-               zip_extract(filename)
-            elif filename.endswith('.tar.gz') == True:
-               tarball_extract(filename)
-            else:
-               raise general_exception(syslog.LOG_ERR, 'File %s is in unknown archive format.' % filename)
-            os.remove(filename)
-
-      return(SUCCESS)
-
-   except general_exception, error:
-      log_messages(error)
+      except:
+         pass
+      log_messages(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
       return(FAILURE)
+
+   # Receive the reply from the prepare_job notification 
+   try:
+      reply = socket_read_all(client_socket)
+   except SocketError, error:
+      try:
+         close_socket(client_socket)
+      except:
+         pass
+      log_messages(logging.ERROR, log_name, error.msg)
+      return(FAILURE)
+
+   try:
+      close_socket(client_socket)
+   except SocketError, error:
+      log_messages(logging.WARNING, log_name, error.msg)
+
+   if reply != 'shutdown':
+      try:
+         decoded = pickle.loads(reply)
+      except:
+         log_messages(logging.ERROR, log_name, 'Failed to decode response')
+         try:
+            os.remove(filename)
+         except:
+            pass
+         return(FAILURE)
+      filename = decoded.data
+
+      # Extract the archive if it exists
+      if filename != '':
+         # Determine the type of archive and then extract it
+         if filename.endswith('.zip') == True:
+            zip_extract(filename)
+         elif filename.endswith('.tar.gz') == True:
+            tarball_extract(filename)
+         else:
+            log_messages(logging.ERROR, log_name, 'File %s is in unknown archive format.' % filename)
+            return(FAILURE)
+         try:
+            os.remove(filename)
+         except:
+            log_messages(logging.ERROR, log_name, 'Unable to remove file "%s"' % filename)
+
+   return(SUCCESS)
 
 if __name__ == '__main__':
     sys.exit(main())

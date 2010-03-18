@@ -17,22 +17,23 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
-Requires: python-%{name}-common
+Requires: python-condorutils
 
 %description
 This package provides Condor job hooks that communicate with a translation
 daemon which interfaces with job delivery protocols outside of condor's
 native job delivery protocol.
 
-%package -n python-%{name}-common
+%package -n python-condorutils
 Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
 BuildRequires: python-devel
 Requires: python >= 2.3
 Obsoletes: condor-job-hooks-common
+Obsoletes: python-condor-job-hooks-common
 
-%description -n python-%{name}-common
-Common functions and utilities used by MRG condor job hooks.
+%description -n python-condorutils
+Common functions and utilities used by condor features.
 
 %prep
 %setup -q
@@ -42,13 +43,15 @@ Common functions and utilities used by MRG condor job hooks.
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/%_libexecdir/condor/hooks
-mkdir -p %{buildroot}/%{python_sitelib}/jobhooks
+mkdir -p %{buildroot}/%{python_sitelib}/condorutils
 mkdir -p %{buildroot}/%_sysconfdir/condor
 cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 rm -f %{buildroot}/%_libexecdir/condor/hooks/hook_evict_claim.*
-cp -f functions.py %{buildroot}/%{python_sitelib}/jobhooks
-touch %{buildroot}/%{python_sitelib}/jobhooks/__init__.py
-cp -f config/job-hooks.conf %{buildroot}/%{_sysconfdir}/condor
+cp -f readconfig.py %{buildroot}/%{python_sitelib}/condorutils
+cp -f osutil.py %{buildroot}/%{python_sitelib}/condorutils
+cp -f socketutil.py %{buildroot}/%{python_sitelib}/condorutils
+cp -f workfetch.py %{buildroot}/%{python_sitelib}/condorutils
+touch %{buildroot}/%{python_sitelib}/condorutils/__init__.py
 
 %post
 %if 0%{?is_fedora} == 0
@@ -65,7 +68,6 @@ rm -rf %{buildroot}
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt INSTALL
-%config(noreplace) %{_sysconfdir}/condor/job-hooks.conf
 %defattr(0755,root,root,-)
 %_libexecdir/condor/hooks/hook_fetch_work.py*
 %_libexecdir/condor/hooks/hook_job_exit.py*
@@ -73,11 +75,14 @@ rm -rf %{buildroot}
 %_libexecdir/condor/hooks/hook_reply_fetch.py*
 %_libexecdir/condor/hooks/hook_update_job_status.py*
 
-%files -n python-%{name}-common
+%files -n python-condorutils
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
-%{python_sitelib}/jobhooks/functions.py*
-%{python_sitelib}/jobhooks/__init__.py*
+%{python_sitelib}/condorutils/readconfig.py*
+%{python_sitelib}/condorutils/osutil.py*
+%{python_sitelib}/condorutils/socketutil.py*
+%{python_sitelib}/condorutils/workfetch.py*
+%{python_sitelib}/condorutils/__init__.py*
 
 %changelog
 * Thu Mar 11 2010  <rrati@redhat> - 1.2-0.2

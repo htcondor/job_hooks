@@ -16,50 +16,78 @@
 import socket
 import pickle
 import sys
-import syslog
+import logging
+import logging.handlers
 import os
-from jobhooks.functions import *
+from condorutils.workfetch import *
+from condorutils.socketutil import *
+from condorutils.osutil import *
+from condorutils.readconfig import *
+
 
 def main(argv=None):
    if argv is None:
       argv = sys.argv
 
-   # Open a connection to the system logger
-   syslog.openlog(os.path.basename(argv[0]))
+   size = {}
+   log_name = os.path.basename(argv[0])
 
    try:
+      config = read_condor_config('JOB_HOOKS', ['IP', 'PORT', 'LOG'])
+   except ConfigError, error:
       try:
-         config = read_condor_config('JOB_HOOKS', ['IP', 'PORT'])
-      except config_err, error:
-         try:
-            config = read_config_file('/etc/condor/job-hooks.conf', 'Hooks')
-         except config_err, error:
-            raise general_exception(syslog.LOG_ERR, *(error.msg + ('Exiting.','')))
+         print >> sys.stderr, 'Warning: %s' % error.msg
+         print >> sys.stderr, 'Attemping to read config from "/etc/condor/job-hooks.conf"'
+         config = read_config_file('/etc/condor/job-hooks.conf', 'Hooks')
+      except ConfigError, error:
+         print >> sys.stderr, 'Error: %s. Exiting' % error.msg
+         return(FAILURE)
 
-      # Create a update_job_status message
-      request = condor_wf()
-      request.type = condor_wf_types.update_job_status
+   try:
+      size = read_condor_config('MAX_JOB_HOOKS', ['LOG'])
+   except:
+      size['log'] = 1000000
 
-      # Store the ClassAd from STDIN in the data portion of the message
-      request.data = ''
-      for line in sys.stdin:
-         request.data = request.data + str(line)
+   base_logger = logging.getLogger(log_name)
+   hndlr = logging.handlers.RotatingFileHandler(filename='%s.update' % config['log'],
+                                                mode='a',
+                                                maxBytes=int(size['log']),
+                                                backupCount=1)
+   hndlr.setLevel(logging.INFO)
+   base_logger.setLevel(logging.INFO)
+   fmtr = logging.Formatter('%(asctime)s %(levelname)s:%(message)s',
+                            '%m/%d %H:%M:%S')
+   hndlr.setFormatter(fmtr)
+   base_logger.addHandler(hndlr)
+
+   # Create a update_job_status message
+   request = condor_wf()
+   request.type = condor_wf_types.update_job_status
+
+   # Store the ClassAd from STDIN in the data portion of the message
+   request.data = ''
+   for line in sys.stdin:
+      request.data = request.data + str(line)
 
       # Send the message
-      client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   try:
+      client_socket.connect((config['ip'], int(config['port'])))
+      client_socket.send(pickle.dumps(request, 2))
+   except Exception, error:
       try:
-         client_socket.connect((config['ip'], int(config['port'])))
-         client_socket.send (pickle.dumps(request, 2))
-      except Exception, error:
          close_socket(client_socket)
-         raise general_exception(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
-      close_socket(client_socket)
-
-      return(SUCCESS)
-
-   except general_exception, error:
-      log_messages(error)
+      except:
+         pass
+      log_messages(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
       return(FAILURE)
+
+   try:
+      close_socket(client_socket)
+   except SocketError, error:
+      log_messages(logging.WARNING, log_name, error.msg)
+
+   return(SUCCESS)
 
 if __name__ == '__main__':
     sys.exit(main())
