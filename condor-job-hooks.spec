@@ -1,10 +1,10 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 0.2
+%define rel 0.1
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
-Version: 1.2
+Version: 1.3
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -87,6 +87,14 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Mon Mar 29 2010  <rrati@redhat> - 1.3-0.1
+- Changed Exception names
+- Changed log_messages to log
+- Renamed python module to condorutils
+- Removed functions.py and moved to separate modules
+- Improved error handling for when calling close_socket and pickle.loads
+- log_messages no long takes an exception, but a list of strings to print
+
 * Thu Mar 11 2010  <rrati@redhat> - 1.2-0.2
 - Added importing of logging module into common functions
 
