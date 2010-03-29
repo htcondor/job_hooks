@@ -14,7 +14,6 @@
 import re
 import tarfile
 import zipfile
-import logging
 import time
 import os
 from cStringIO import StringIO
@@ -72,15 +71,6 @@ def run_cmd(cmd, args, environ=None):
          except:
             pass
    return (retcode, std_out, std_err)
-
-
-def log_messages(level, logger_name, *msgs):
-   """Logs messages in the passed msgs to the logger with the provided
-      logger_name."""
-   logger = logging.getLogger(logger_name)
-   for msg in msgs:
-      if (msg != ''):
-         logger.log(level, msg)
 
 
 def write_file(filename, data):

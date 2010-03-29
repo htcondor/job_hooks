@@ -47,11 +47,12 @@ mkdir -p %{buildroot}/%{python_sitelib}/condorutils
 mkdir -p %{buildroot}/%_sysconfdir/condor
 cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
 rm -f %{buildroot}/%_libexecdir/condor/hooks/hook_evict_claim.*
+cp -f __init__.py %{buildroot}/%{python_sitelib}/condorutils
 cp -f readconfig.py %{buildroot}/%{python_sitelib}/condorutils
 cp -f osutil.py %{buildroot}/%{python_sitelib}/condorutils
 cp -f socketutil.py %{buildroot}/%{python_sitelib}/condorutils
 cp -f workfetch.py %{buildroot}/%{python_sitelib}/condorutils
-touch %{buildroot}/%{python_sitelib}/condorutils/__init__.py
+cp -f log.py %{buildroot}/%{python_sitelib}/condorutils
 
 %post
 %if 0%{?is_fedora} == 0
@@ -78,11 +79,12 @@ rm -rf %{buildroot}
 %files -n python-condorutils
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt
-%{python_sitelib}/condorutils/readconfig.py*
+%{python_sitelib}/condorutils/__init__.py*
+%{python_sitelib}/condorutils/log.py*
 %{python_sitelib}/condorutils/osutil.py*
+%{python_sitelib}/condorutils/readconfig.py*
 %{python_sitelib}/condorutils/socketutil.py*
 %{python_sitelib}/condorutils/workfetch.py*
-%{python_sitelib}/condorutils/__init__.py*
 
 %changelog
 * Thu Mar 11 2010  <rrati@redhat> - 1.2-0.2

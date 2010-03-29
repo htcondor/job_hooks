@@ -19,10 +19,11 @@ SPECS/${SPEC}: ${SPEC}
 	mkdir -p SPECS
 	cp -f ${SPEC} SPECS
 
-SOURCES/${SOURCE}: hooks/functions.py hooks/hook_evict_claim.py \
-                         hooks/hook_fetch_work.py hooks/hook_job_exit.py \
-                         hooks/hook_prepare_job.py hooks/hook_reply_fetch.py \
-                         hooks/hook_update_job_status.py
+SOURCES/${SOURCE}: hooks/__init__.py hooks/log.py hooks/osutil.py \
+                   hooks/readconfig.py hooks/socketutil.py hooks/workfetch.py \
+                   hooks/hook_evict_claim.py hooks/hook_fetch_work.py \
+                   hooks/hook_job_exit.py hooks/hook_prepare_job.py \
+                   hooks/hook_reply_fetch.py hooks/hook_update_job_status.py
 	mkdir -p SOURCES
 	rm -rf ${DIR}
 	mkdir ${DIR}

@@ -11,5 +11,13 @@ JOB_HOOKS_PORT:
    Desc: The port on JOB_HOOKS_IP the translation daemon is listening
          for connections
 
+JOB_HOOKS_LOG:
+   Type: String
+   Desc: The location of the log file for the job-hooks to use for logging
+
+MAX_JOB_HOOKS_LOG:
+   Type: Interger
+   Desc: The maximum size of the job-hooks log before rotating
+
 If the configuration is not found in condor's configuration files, then
 the job hooks will look in /etc/condor/job-hooks.conf.

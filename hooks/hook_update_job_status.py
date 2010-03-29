@@ -17,19 +17,19 @@ import socket
 import pickle
 import sys
 import logging
-import logging.handlers
 import os
+from condorutils import SUCCESS, FAILURE
 from condorutils.workfetch import *
 from condorutils.socketutil import *
 from condorutils.osutil import *
 from condorutils.readconfig import *
+from condorutils.log import *
 
 
 def main(argv=None):
    if argv is None:
       argv = sys.argv
 
-   size = {}
    log_name = os.path.basename(argv[0])
 
    try:
@@ -44,21 +44,11 @@ def main(argv=None):
          return(FAILURE)
 
    try:
-      size = read_condor_config('MAX_JOB_HOOKS', ['LOG'])
+      size = int(read_condor_config('MAX_JOB_HOOKS', ['LOG'])['log'])
    except:
-      size['log'] = 1000000
+      size = 1000000
 
-   base_logger = logging.getLogger(log_name)
-   hndlr = logging.handlers.RotatingFileHandler(filename='%s.update' % config['log'],
-                                                mode='a',
-                                                maxBytes=int(size['log']),
-                                                backupCount=1)
-   hndlr.setLevel(logging.INFO)
-   base_logger.setLevel(logging.INFO)
-   fmtr = logging.Formatter('%(asctime)s %(levelname)s:%(message)s',
-                            '%m/%d %H:%M:%S')
-   hndlr.setFormatter(fmtr)
-   base_logger.addHandler(hndlr)
+   base_logger = create_file_logger(log_name, '%s.update' % config['log'], logging.INFO, size=size)
 
    # Create a update_job_status message
    request = condor_wf()
