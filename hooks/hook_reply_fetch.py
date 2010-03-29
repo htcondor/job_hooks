@@ -58,7 +58,7 @@ def main(argv=None):
    elif reply_type == 'reject':
       request.type = condor_wf_types.reply_claim_reject
    else:
-      log_messages(logging.ERROR, log_name, 'Received unknown reply fetch type: %s' % reply_type)
+      log(logging.ERROR, log_name, 'Received unknown reply fetch type: %s' % reply_type)
       return(FAILURE)
 
    # Store the ClassAd from STDIN in the data portion of the message
@@ -76,12 +76,12 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      log_messages(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
+      log(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
 
    try:
       close_socket(client_socket)
    except SocketError, error:
-      log_messages(logging.WARNING, log_name, error.msg)
+      log(logging.WARNING, log_name, error.msg)
 
    return(SUCCESS)
 

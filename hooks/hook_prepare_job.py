@@ -71,7 +71,7 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      log_messages(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
+      log(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
       return(FAILURE)
 
    # Receive the reply from the prepare_job notification 
@@ -82,19 +82,19 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      log_messages(logging.ERROR, log_name, error.msg)
+      log(logging.ERROR, log_name, error.msg)
       return(FAILURE)
 
    try:
       close_socket(client_socket)
    except SocketError, error:
-      log_messages(logging.WARNING, log_name, error.msg)
+      log(logging.WARNING, log_name, error.msg)
 
    if reply != 'shutdown':
       try:
          decoded = pickle.loads(reply)
       except:
-         log_messages(logging.ERROR, log_name, 'Failed to decode response')
+         log(logging.ERROR, log_name, 'Failed to decode response')
          try:
             os.remove(filename)
          except:
@@ -110,12 +110,12 @@ def main(argv=None):
          elif filename.endswith('.tar.gz') == True:
             tarball_extract(filename)
          else:
-            log_messages(logging.ERROR, log_name, 'File %s is in unknown archive format.' % filename)
+            log(logging.ERROR, log_name, 'File %s is in unknown archive format.' % filename)
             return(FAILURE)
          try:
             os.remove(filename)
          except:
-            log_messages(logging.ERROR, log_name, 'Unable to remove file "%s"' % filename)
+            log(logging.ERROR, log_name, 'Unable to remove file "%s"' % filename)
 
    return(SUCCESS)
 

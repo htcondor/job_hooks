@@ -68,13 +68,13 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      log_messages(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
+      log(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
       return(FAILURE)
 
    try:
       close_socket(client_socket)
    except SocketError, error:
-      log_messages(logging.WARNING, log_name, error.msg)
+      log(logging.WARNING, log_name, error.msg)
 
    return(SUCCESS)
 

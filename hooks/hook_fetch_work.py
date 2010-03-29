@@ -69,7 +69,7 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      log_messages(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
+      log(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
       return(FAILURE)
 
    # Get receive the work information and print to stdout
@@ -80,19 +80,19 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      log_messages(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
+      log(logging.ERROR, log_name, 'socket error %d: %s' % (error[0], error[1]))
       return(FAILURE)
 
    try:
       close_socket(client_socket)
    except SocketError, error:
-      log_messages(logging.WARNING, log_name, error.msg)
+      log(logging.WARNING, log_name, error.msg)
 
    if reply != 'shutdown':
       try:
          decoded = pickle.loads(reply)
       except:
-         log_messages(logging.ERROR, log_name, 'Unable to decode reponse')
+         log(logging.ERROR, log_name, 'Unable to decode reponse')
          return(FAILURE)
       if decoded.data != '':
          print decoded.data
