@@ -16,6 +16,7 @@ import tarfile
 import zipfile
 import time
 import os
+import shlex
 from cStringIO import StringIO
 try:
    from subprocess import *
@@ -25,29 +26,44 @@ except:
    use_popen2 = True
 
 
-def run_cmd(cmd, args, environ=None):
+def run_cmd(cmd, environ={}, inter=False):
    """Runs the command specified in 'cmd' with the given 'args' using
       either the subprocess module or the open2 module, depending on which
       is supported.  The subprocess module is favored.  Returns
       (return_code, stdout, stderr)"""
    retcode = -1
-   std_out = ''
-   std_err = ''
-   if environ != None:
-      try:
-         for var in environ.keys():
-            os.environ[var] = environ[var]
-      except:
-         return ([-1, None, None])
-
-   if use_popen2 == False:
-      cmd_list = [cmd]
-      cmd_list += args.split(' ')
-      obj = Popen(cmd_list, stdout=PIPE, stderr=PIPE)
+   std_out = None
+   std_err = None
+   if environ == {}:
+      env = os.environ
+   else:
+      env = environ
+   env['PATH'] = '/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin'
+   if inter == True:
+      pid = os.fork()
+      if pid == 0:
+         cmd_list = shlex.split(cmd)
+         os.execvpe(cmd_list[0], cmd_list, env)
+      else:
+         retcode = os.waitpid(pid, 0)[0]
+         std_out = None
+         std_err = None
+   elif use_popen2 == False:
+      cmd_list = shlex.split(cmd)
+      obj = Popen(cmd_list, stdout=PIPE, stderr=PIPE, env=env)
       (std_out, std_err) = obj.communicate()
       retcode = obj.returncode
    else:
-      obj = Popen3('%s %s' % (cmd, args), True)
+      if environ != {}:
+         old_env = os.environ
+         try:
+            for var in environ.keys():
+               os.environ[var] = environ[var]
+            os.environ['PATH'] = '/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin'
+         except:
+            return ([-1, None, None])
+
+      obj = Popen3(cmd, True)
       retcode = obj.wait()
       try:
          std_out = obj.fromchild.readlines()[0]
@@ -64,12 +80,8 @@ def run_cmd(cmd, args, environ=None):
       except:
          pass
 
-   if environ != None:
-      for var in environ.keys():
-         try:
-            del os.environ[var]
-         except:
-            pass
+      if environ != {}:
+         os.environ = old_env
    return (retcode, std_out, std_err)
 
 
