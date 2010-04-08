@@ -4,7 +4,7 @@
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
-Version: 1.3
+Version: 1.4
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -87,6 +87,13 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Thu Apr  8 2010  <rrati@redhat> - 1.4-0.1
+- Added option param to run_cmd (inter).  This will allow commands to be
+  run that require user interaction
+- Fixed setting of environment before executing the command.  PATH is
+  always overriden and defined as a trusted set of directories.
+- Updated usage of run_cmd
+
 * Mon Mar 29 2010  <rrati@redhat> - 1.3-0.1
 - Changed Exception names
 - Changed log_messages to log
