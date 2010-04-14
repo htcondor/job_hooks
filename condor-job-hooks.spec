@@ -45,14 +45,9 @@ rm -rf %{buildroot}
 mkdir -p %{buildroot}/%_libexecdir/condor/hooks
 mkdir -p %{buildroot}/%{python_sitelib}/condorutils
 mkdir -p %{buildroot}/%_sysconfdir/condor
-cp -f hook*.py %{buildroot}/%_libexecdir/condor/hooks
+cp -f hooks/hook*.py %{buildroot}/%_libexecdir/condor/hooks
 rm -f %{buildroot}/%_libexecdir/condor/hooks/hook_evict_claim.*
-cp -f __init__.py %{buildroot}/%{python_sitelib}/condorutils
-cp -f readconfig.py %{buildroot}/%{python_sitelib}/condorutils
-cp -f osutil.py %{buildroot}/%{python_sitelib}/condorutils
-cp -f socketutil.py %{buildroot}/%{python_sitelib}/condorutils
-cp -f workfetch.py %{buildroot}/%{python_sitelib}/condorutils
-cp -f log.py %{buildroot}/%{python_sitelib}/condorutils
+cp -f module/*.py %{buildroot}/%{python_sitelib}/condorutils
 
 %post
 %if 0%{?is_fedora} == 0

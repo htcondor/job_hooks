@@ -17,6 +17,7 @@ import zipfile
 import time
 import os
 import shlex
+import copy
 from cStringIO import StringIO
 try:
    from subprocess import *
@@ -35,9 +36,9 @@ def run_cmd(cmd, environ={}, inter=False):
    std_out = None
    std_err = None
    if environ == {}:
-      env = os.environ
+      env = copy.deepcopy(os.environ)
    else:
-      env = environ
+      env = copy.deepcopy(environ)
    env['PATH'] = '/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin'
    if inter == True:
       pid = os.fork()
@@ -55,11 +56,10 @@ def run_cmd(cmd, environ={}, inter=False):
       retcode = obj.returncode
    else:
       if environ != {}:
-         old_env = os.environ
+         old_env = copy.deepcopy(os.environ)
          try:
-            for var in environ.keys():
-               os.environ[var] = environ[var]
-            os.environ['PATH'] = '/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin'
+            for var in env.keys():
+               os.environ[var] = env[var]
          except:
             return ([-1, None, None])
 
@@ -81,7 +81,7 @@ def run_cmd(cmd, environ={}, inter=False):
          pass
 
       if environ != {}:
-         os.environ = old_env
+         os.environ = copy.deepcopy(old_env)
    return (retcode, std_out, std_err)
 
 

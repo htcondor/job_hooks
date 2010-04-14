@@ -19,15 +19,17 @@ SPECS/${SPEC}: ${SPEC}
 	mkdir -p SPECS
 	cp -f ${SPEC} SPECS
 
-SOURCES/${SOURCE}: hooks/__init__.py hooks/log.py hooks/osutil.py \
-                   hooks/readconfig.py hooks/socketutil.py hooks/workfetch.py \
-                   hooks/hook_evict_claim.py hooks/hook_fetch_work.py \
-                   hooks/hook_job_exit.py hooks/hook_prepare_job.py \
-                   hooks/hook_reply_fetch.py hooks/hook_update_job_status.py
+SOURCES/${SOURCE}: module/__init__.py module/log.py module/osutil.py \
+                   module/readconfig.py module/socketutil.py \
+                   module/workfetch.py hooks/hook_evict_claim.py \
+                   hooks/hook_fetch_work.py hooks/hook_job_exit.py \
+                   hooks/hook_prepare_job.py hooks/hook_reply_fetch.py \
+                   hooks/hook_update_job_status.py
 	mkdir -p SOURCES
 	rm -rf ${DIR}
 	mkdir ${DIR}
-	cp -f hooks/* ${DIR}
+	cp -Rf hooks ${DIR}
+	cp -Rf module ${DIR}
 	cp -f LICENSE-2.0.txt ${DIR}
 	cp -f INSTALL ${DIR}
 	tar -cf ${SOURCE} ${DIR}
