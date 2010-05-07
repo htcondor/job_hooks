@@ -36,12 +36,12 @@ def read_condor_config(subsys, attr_list, environ={}):
          raise ConfigError('"%s" is not defined' % subsys)
    else:
       for attr in attr_list:
-         (rcode, value, stderr) = run_cmd('condor_config_val %s_%s' % (subsys, attr, environ=environ))
+         (rcode, value, stderr) = run_cmd('condor_config_val %s_%s' % (subsys, attr), environ=environ)
          if rcode == 0:
             config[attr.lower()] = value.strip()
          else:
             # Try the newer <subsys>.param form
-            (rcode, value, stderr) = run_cmd('condor_config_val %s.%s' % (subsys, attr, environ=environ))
+            (rcode, value, stderr) = run_cmd('condor_config_val %s.%s' % (subsys, attr), environ=environ)
             if rcode == 0:
                config[attr.lower()] = value.strip()
             else:
