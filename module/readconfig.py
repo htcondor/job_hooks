@@ -22,13 +22,13 @@ class ConfigError(Exception):
       self.msg = msg
 
 
-def read_condor_config(subsys, attr_list):
+def read_condor_config(subsys, attr_list, environ={}):
    """ Uses condor_config_val to look up values in condor's configuration.
        First looks for subsys_param, then for the newer subsys.param.
        Returns map(param, value)"""
    config = {}
    if attr_list == []:
-      (rcode, value, stderr) = run_cmd('condor_config_val %s' % (subsys))
+      (rcode, value, stderr) = run_cmd('condor_config_val %s' % (subsys), environ=environ)
       if rcode == 0:
          config[subsys.lower()] = value.strip()
       else:
@@ -36,12 +36,12 @@ def read_condor_config(subsys, attr_list):
          raise ConfigError('"%s" is not defined' % subsys)
    else:
       for attr in attr_list:
-         (rcode, value, stderr) = run_cmd('condor_config_val %s_%s' % (subsys, attr))
+         (rcode, value, stderr) = run_cmd('condor_config_val %s_%s' % (subsys, attr, environ=environ))
          if rcode == 0:
             config[attr.lower()] = value.strip()
          else:
             # Try the newer <subsys>.param form
-            (rcode, value, stderr) = run_cmd('condor_config_val %s.%s' % (subsys, attr))
+            (rcode, value, stderr) = run_cmd('condor_config_val %s.%s' % (subsys, attr, environ=environ))
             if rcode == 0:
                config[attr.lower()] = value.strip()
             else:
