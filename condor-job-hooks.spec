@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 0.2
+%define rel 0.3
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -82,6 +82,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Wed Apr 14 2010  <rrati@redhat> - 1.4-0.3
+- Added optional environ param to read_condor_config
+
 * Wed Apr 14 2010  <rrati@redhat> - 1.4-0.2
 - Fixed issue setting/reseting environment variables when popen2 is used.
   Any params set by the caller were not getting reset by the time run_cmd
