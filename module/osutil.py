@@ -39,7 +39,11 @@ def run_cmd(cmd, environ={}, inter=False):
       env = copy.deepcopy(os.environ)
    else:
       env = copy.deepcopy(environ)
-   env['PATH'] = '/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin'
+   if os.name != 'nt' and os.name != 'ce':
+      env['PATH'] = '/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin'
+   else:
+      # Use the OS defined path
+      env['PATH'] = os.environ['PATH']
    if inter == True:
       pid = os.fork()
       if pid == 0:
@@ -50,10 +54,13 @@ def run_cmd(cmd, environ={}, inter=False):
          std_out = None
          std_err = None
    elif use_popen2 == False:
-      cmd_list = shlex.split(cmd)
-      obj = Popen(cmd_list, stdout=PIPE, stderr=PIPE, env=env)
-      (std_out, std_err) = obj.communicate()
-      retcode = obj.returncode
+      try:
+         cmd_list = shlex.split(cmd)
+         obj = Popen(cmd_list, stdout=PIPE, stderr=PIPE, env=env)
+         (std_out, std_err) = obj.communicate()
+         retcode = obj.returncode
+      except:
+         return (-1, None, None)
    else:
       if environ != {}:
          old_env = copy.deepcopy(os.environ)
@@ -61,10 +68,14 @@ def run_cmd(cmd, environ={}, inter=False):
             for var in env.keys():
                os.environ[var] = env[var]
          except:
-            return ([-1, None, None])
+            return (-1, None, None)
 
-      obj = Popen3(cmd, True)
-      retcode = obj.wait()
+      try:
+         obj = Popen3(cmd, True)
+         retcode = obj.wait()
+      except:
+         return (-1, None, None)
+
       try:
          std_out = obj.fromchild.readlines()[0]
          obj.fromchild.close()
