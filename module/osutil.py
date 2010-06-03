@@ -37,6 +37,10 @@ def run_cmd(cmd, environ={}, inter=False):
    std_err = None
    if environ == {}:
       env = copy.deepcopy(os.environ)
+   elif os.name == 'nt' or os.name == 'ce':
+      env = copy.deepcopy(os.environ)
+      for param in environ.keys():
+         env[param] = environ[param]
    else:
       env = copy.deepcopy(environ)
    if os.name != 'nt' and os.name != 'ce':
