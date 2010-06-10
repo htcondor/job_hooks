@@ -49,6 +49,8 @@ def main(argv=None):
 
    base_logger = create_file_logger(log_name, '%s.evict' % config['log'], logging.INFO, size=size)
 
+   log(logging.INFO, log_name, 'Hook called')
+
    # Create an evict claim
    request = condor_wf()
    request.type = condor_wf_types.evict_claim
@@ -58,7 +60,12 @@ def main(argv=None):
    for line in sys.stdin:
       request.data = request.data + str(line)
 
+   slots = grep('^WF_REQ_SLOT\s*=\s*"(.+)"$', request.data)
+   if slots != None:
+      log(logging.INFO, log_name, 'Slot %s is making the request' % slots[0].strip())
+
    # Send the message
+   log(logging.INFO, log_name, 'Contacting daemon')
    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
    try:
       client_socket.connect((config['ip'], int(config['port'])))
@@ -76,6 +83,7 @@ def main(argv=None):
    except SocketError, error:
       log(logging.WARNING, log_name, error.msg)
 
+   log(logging.INFO, log_name, 'Hook exiting')
    return(SUCCESS)
 
 if __name__ == '__main__':

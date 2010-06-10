@@ -50,6 +50,8 @@ def main(argv=None):
 
    base_logger = create_file_logger(log_name, '%s.fetch' % config['log'], logging.INFO, size=size)
 
+   log(logging.INFO, log_name, 'Hook called')
+
    # Create a get_work request
    request = condor_wf()
    request.type = condor_wf_types.get_work
@@ -59,7 +61,12 @@ def main(argv=None):
    for line in sys.stdin:
       request.data = request.data + str(line)
 
+   slots = grep('^SlotID\s*=\s*(.+)$', request.data)
+   if slots != None:
+      log(logging.INFO, log_name, 'Slot %s is making the request' % slots[0].strip())
+
    # Send the request
+   log(logging.INFO, log_name, 'Contacting daemon')
    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
    try:
       client_socket.connect((config['ip'], int(config['port'])))
@@ -75,6 +82,7 @@ def main(argv=None):
    # Get receive the work information and print to stdout
    try:
       reply = socket_read_all(client_socket)
+      log(logging.INFO, log_name, 'Received data from daemon')
    except socket.error, error:
       try:
          close_socket(client_socket)
@@ -97,6 +105,7 @@ def main(argv=None):
       if decoded.data != '':
          print decoded.data
 
+   log(logging.INFO, log_name, 'Hook exiting')
    return(SUCCESS)
 
 if __name__ == '__main__':

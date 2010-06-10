@@ -50,6 +50,8 @@ def main(argv=None):
 
    base_logger = create_file_logger(log_name, '%s.prepare' % config['log'], logging.INFO, size=size)
 
+   log(logging.INFO, log_name, 'Hook called')
+
    # Create a prepare_job notification
    request = condor_wf()
    request.type = condor_wf_types.prepare_job
@@ -61,7 +63,12 @@ def main(argv=None):
       request.data = request.data + str(line)
    request.data = request.data + 'OriginatingCWD = "' + cwd + '"\n'
 
+   slots = grep('^WF_REQ_SLOT\s*=\s*"(.+)"$', request.data)
+   if slots != None:
+      log(logging.INFO, log_name, 'Slot %s is making the request' % slots[0].strip())
+
    # Send the message
+   log(logging.INFO, log_name, 'Contacting daemon')
    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
    try:
       client_socket.connect((config['ip'], int(config['port'])))
@@ -77,6 +84,7 @@ def main(argv=None):
    # Receive the reply from the prepare_job notification 
    try:
       reply = socket_read_all(client_socket)
+      log(logging.INFO, log_name, 'Received data from daemon')
    except SocketError, error:
       try:
          close_socket(client_socket)
@@ -117,6 +125,7 @@ def main(argv=None):
          except:
             log(logging.ERROR, log_name, 'Unable to remove file "%s"' % filename)
 
+   log(logging.INFO, log_name, 'Hook exiting')
    return(SUCCESS)
 
 if __name__ == '__main__':
