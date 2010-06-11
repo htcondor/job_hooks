@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 0.4
+%define rel 0.5
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -82,6 +82,10 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Fri Jun 11 2010  <rrati@redhat> - 1.4-0.5
+- Additional logging
+- Prepare hook will log to syslog
+
 * Thu Jun 03 2010  <rrati@redhat> - 1.4-0.4
 - Fix setting of PATH on non-Unix machines in run_cmd
 - Better handle errors when running commands in run_cmd
