@@ -17,7 +17,11 @@ import socket
 import pickle
 import sys
 import os
-import syslog
+if os.name != 'nt' and os.name != 'ce':
+   import syslog
+   use_syslog = True
+else:
+   use_syslog = False
 from condorutils import SUCCESS, FAILURE
 from condorutils.workfetch import *
 from condorutils.socketutil import *
@@ -33,11 +37,13 @@ def main(argv=None):
       config = read_condor_config('JOB_HOOKS', ['IP', 'PORT', 'LOG'])
    except ConfigError, error:
       try:
-         syslog.syslog(syslog.LOG_WARNING, 'Warning: %s' % error.msg)
-         syslog.syslog(syslog.LOG_INFO, 'Attemping to read config from "/etc/condor/job-hooks.conf"')
+         if use_syslog == True:
+            syslog.syslog(syslog.LOG_WARNING, 'Warning: %s' % error.msg)
+            syslog.syslog(syslog.LOG_INFO, 'Attemping to read config from "/etc/condor/job-hooks.conf"')
          config = read_config_file('/etc/condor/job-hooks.conf', 'Hooks')
       except ConfigError, error:
-         syslog.syslog(syslog.LOG_ERR, 'Error: %s. Exiting' % error.msg)
+         if use_syslog == True:
+            syslog.syslog(syslog.LOG_ERR, 'Error: %s. Exiting' % error.msg)
          return(FAILURE)
 
    # Create a prepare_job notification
@@ -61,7 +67,8 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      syslog.syslog(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
+      if use_syslog == True:
+         syslog.syslog(syslog.LOG_ERR, 'socket error %d: %s' % (error[0], error[1]))
       return(FAILURE)
 
    # Receive the reply from the prepare_job notification 
@@ -72,19 +79,26 @@ def main(argv=None):
          close_socket(client_socket)
       except:
          pass
-      syslog.syslog(syslog.LOG_ERR, error.msg)
+      if use_syslog == True:
+         syslog.syslog(syslog.LOG_ERR, error.msg)
       return(FAILURE)
 
    try:
       close_socket(client_socket)
    except SocketError, error:
-      syslog.syslog(syslog.LOG_WARNING, error.msg)
+      if use_syslog == True:
+         syslog.syslog(syslog.LOG_WARNING, error.msg)
+      else:
+         pass
 
    if reply != 'shutdown':
       try:
          decoded = pickle.loads(reply)
       except:
-         syslog.syslog(syslog.LOG_ERR, 'Failed to decode response')
+         if use_syslog == True:
+            syslog.syslog(syslog.LOG_ERR, 'Failed to decode response')
+         else:
+            pass
          try:
             os.remove(filename)
          except:
@@ -100,12 +114,16 @@ def main(argv=None):
          elif filename.endswith('.tar.gz') == True:
             tarball_extract(filename)
          else:
-            syslog.syslog(syslog.LOG_ERR, 'File %s is in unknown archive format.' % filename)
+            if use_syslog == True:
+               syslog.syslog(syslog.LOG_ERR, 'File %s is in unknown archive format.' % filename)
             return(FAILURE)
          try:
             os.remove(filename)
          except:
-            syslog.syslog(syslog.LOG_ERR, 'Unable to remove file "%s"' % filename)
+            if use_syslog == True:
+               syslog.syslog(syslog.LOG_ERR, 'Unable to remove file "%s"' % filename)
+            else:
+               pass
 
    return(SUCCESS)
 
