@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 0.6
+%define rel 1
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -17,7 +17,7 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
-Requires: python-condorutils
+Requires: python-condorutils >= 1.4
 
 %description
 This package provides Condor job hooks that communicate with a translation
@@ -27,7 +27,7 @@ native job delivery protocol.
 %package -n python-condorutils
 Summary: Common functions/utilities for condor job hooks
 Group: Applications/System
-BuildRequires: python-devel
+BuildRequires: python-devel >= 2.3
 Requires: python >= 2.3
 Obsoletes: condor-job-hooks-common
 Obsoletes: python-condor-job-hooks-common
@@ -82,6 +82,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Mon Jun 28 2010  <rrati@redhat> - 1.4-1
+- Updated dependecy versions
+
 * Fri Jun 11 2010  <rrati@redhat> - 1.4-0.6
 - The prepare hook only logs on non-windows machines
 
