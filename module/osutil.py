@@ -81,7 +81,9 @@ def run_cmd(cmd, environ={}, inter=False):
          return (-1, None, None)
 
       try:
-         std_out = obj.fromchild.readlines()[0]
+         std_out = ''
+         for line in obj.fromchild:
+            std_out = std_out + line
          obj.fromchild.close()
       except:
          pass
@@ -90,12 +92,16 @@ def run_cmd(cmd, environ={}, inter=False):
       except:
          pass
       try:
-         std_err = obj.childerr.readlines()[0]
+         std_err = ''
+         for line in obj.childerr:
+            std_err = std_err + line
          obj.childerr.close()
       except:
          pass
 
       if environ != {}:
+         for var in env.keys():
+            del os.environ[var]
          os.environ = copy.deepcopy(old_env)
    return (retcode, std_out, std_err)
 
