@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 2
+%define rel 3
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -82,6 +82,10 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Mon Aug 02 2010  <rrati@redhat> - 1.4-3
+- Fixed issue with run_cmd causing a deadlock when commands returned
+  a large amount of data on python2.3
+
 * Fri Jul 23 2010  <rrati@redhat> - 1.4-2
 - Fixed output of run_cmd on python2.3 when using popen2
 - Fixed resetting of environment variables when run on python2.3
