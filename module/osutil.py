@@ -76,7 +76,6 @@ def run_cmd(cmd, environ={}, inter=False):
 
       try:
          obj = Popen3(cmd, True)
-         retcode = obj.wait()
       except:
          return (-1, None, None)
 
@@ -99,6 +98,7 @@ def run_cmd(cmd, environ={}, inter=False):
       except:
          pass
 
+      retcode = obj.wait()
       if environ != {}:
          for var in env.keys():
             del os.environ[var]
