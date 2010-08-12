@@ -33,8 +33,10 @@ def main(argv=None):
    if argv is None:
       argv = sys.argv
 
+   if use_syslog == True:
+      syslog.openlog(os.path.basename(argv[0]))
    try:
-      config = read_condor_config('JOB_HOOKS', ['IP', 'PORT', 'LOG'])
+      config = read_condor_config('JOB_HOOKS', ['IP', 'PORT'])
    except ConfigError, error:
       try:
          if use_syslog == True:
