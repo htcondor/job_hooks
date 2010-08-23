@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 4
+%define rel 5
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -82,6 +82,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Mon Aug 23 2010  <rrati@redhat> - 1.4-5
+- Fixed typo in status hook
+
 * Thu Aug 12 2010  <rrati@redhat> - 1.4-4
 - update, exit, and status hooks all log to syslog
 
