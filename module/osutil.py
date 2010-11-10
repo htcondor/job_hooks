@@ -169,7 +169,9 @@ def zip_extract(filename):
    for name in contents:
       info = zip.getinfo(name)
       file_time = time.mktime(info.date_time + (0, 0, -1))
-      os.chmod(name, info.external_attr >> 16L)
+      perms = info.external_attr >> 16L
+      if perms > 0:
+         os.chmod(name, perms)
       os.utime(name, (file_time, file_time))
 
 
