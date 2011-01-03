@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 6
+%define rel 7
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -8,10 +8,7 @@ Version: 1.4
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
-URL: http://www.redhat.com/mrg
-# This is a Red Hat maintained package which is specific to
-# our distribution.  Thus the source is only available from
-# within this srpm.
+URL: http://git.fedorahosted.org/git/grid/job_hooks.git
 Source0: %{name}-%{version}-%{rel}.tar.gz
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
@@ -82,6 +79,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Mon Jan  3 2011  <rrati@redhat> - 1.4-7
+- Update source URL
+
 * Wed Nov 10 2010  <rrati@redhat> - 1.4-6
 - If zip does not include permissions info, do not explicitly set and leave
   to umask
