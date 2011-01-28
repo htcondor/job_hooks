@@ -44,7 +44,7 @@ def run_cmd(cmd, environ={}, inter=False):
    else:
       env = copy.deepcopy(environ)
    if os.name != 'nt' and os.name != 'ce':
-      env['PATH'] = '/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin'
+      env['PATH'] = '/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:%s' % os.environ['PATH']
    else:
       # Use the OS defined path
       env['PATH'] = os.environ['PATH']
