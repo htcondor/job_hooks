@@ -27,26 +27,29 @@ def read_condor_config(subsys, attr_list, environ={}):
        First looks for subsys_param, then for the newer subsys.param.
        Returns map(param, value)"""
    config = {}
-   if attr_list == []:
-      (rcode, value, stderr) = run_cmd('condor_config_val %s' % (subsys), environ=environ)
-      if rcode == 0:
-         config[subsys.lower()] = value.strip()
-      else:
-         # Config value not found.  Raise an exception
-         raise ConfigError('"%s" is not defined' % subsys)
-   else:
-      for attr in attr_list:
+   for attr in attr_list:
+      found = False
+      if subsys != '':
          (rcode, value, stderr) = run_cmd('condor_config_val %s_%s' % (subsys, attr), environ=environ)
          if rcode == 0:
+            found = True
             config[attr.lower()] = value.strip()
          else:
             # Try the newer <subsys>.param form
             (rcode, value, stderr) = run_cmd('condor_config_val %s.%s' % (subsys, attr), environ=environ)
             if rcode == 0:
+               found = True
                config[attr.lower()] = value.strip()
-            else:
-               # Config value not found.  Raise an exception
-               raise ConfigError('"%s_%s" is not defined' % (subsys, attr))
+
+      if found == False:
+         (rcode, value, stderr) = run_cmd('condor_config_val ' + attr, environ=environ)
+         if rcode == 0:
+            found = True
+            config[attr.lower()] = value.strip()
+
+      if found == False:
+         # Config value not found.  Raise an exception
+         raise ConfigError('"%s" is not defined' % attr)
    return config
 
 
