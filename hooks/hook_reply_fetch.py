@@ -44,7 +44,7 @@ def main(argv=None):
          return(FAILURE)
 
    try:
-      size = int(read_condor_config('MAX_JOB_HOOKS', ['LOG'])['log'])
+      size = int(read_condor_config('', ['MAX_JOB_HOOKS_LOG'])['max_job_hooks_log'])
    except:
       size = 1000000
 
