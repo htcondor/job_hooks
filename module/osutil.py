@@ -186,6 +186,7 @@ def tarball_extract(filename):
    tarball.close()
 
 
+# This method comes from the jython code base.
 def _cmdline2list(cmdline):
    """Build an argv list from a Microsoft shell style cmdline str
       following the MS C runtime rules."""
