@@ -1,10 +1,10 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 7
+%define rel 1
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
-Version: 1.4
+Version: 1.5
 Release: %{rel}%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -14,7 +14,7 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
-Requires: python-condorutils >= 1.4
+Requires: python-condorutils >= 1.5
 
 %description
 This package provides Condor job hooks that communicate with a translation
@@ -79,6 +79,12 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Tue Feb  8 2011  <rrati@redhat> - 1.5-1
+- Append the PATH from the environment of the caller to the predefined path in
+  run_cmd
+- Changed the workings of read_condor_config
+- Updated hooks to use new read_condor_config
+
 * Mon Jan  3 2011  <rrati@redhat> - 1.4-7
 - Update source URL
 
