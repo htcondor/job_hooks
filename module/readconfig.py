@@ -41,15 +41,15 @@ def read_condor_config(subsys, attr_list, environ={}):
                found = True
                config[attr.lower()] = value.strip()
 
-      if found == False:
-         (rcode, value, stderr) = run_cmd('condor_config_val ' + attr, environ=environ)
-         if rcode == 0:
-            found = True
-            config[attr.lower()] = value.strip()
+   if found == False:
+      (rcode, value, stderr) = run_cmd('condor_config_val ' + attr, environ=environ)
+      if rcode == 0:
+         found = True
+         config[attr.lower()] = value.strip()
 
-      if found == False:
-         # Config value not found.  Raise an exception
-         raise ConfigError('"%s" is not defined' % attr)
+   if found == False:
+      # Config value not found.  Raise an exception
+      raise ConfigError('"%s" is not defined' % attr)
    return config
 
 
