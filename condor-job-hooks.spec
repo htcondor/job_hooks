@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%define rel 1
+%global rel 2
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -14,7 +14,7 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch: noarch
 Requires: python >= 2.3
 Requires: condor >= 7.0.2-4
-Requires: python-condorutils >= 1.5
+Requires: python-condorutils = %{version}-%{rel}%{?dist}
 
 %description
 This package provides Condor job hooks that communicate with a translation
@@ -79,6 +79,9 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Mon Mar 14 2011  <rrati@redhat> - 1.5-2
+- Fixed issue with run_cmd parsing args on windows
+
 * Tue Feb  8 2011  <rrati@redhat> - 1.5-1
 - Append the PATH from the environment of the caller to the predefined path in
   run_cmd
