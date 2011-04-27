@@ -41,11 +41,16 @@ def read_condor_config(subsys, attr_list, environ={}):
                found = True
                config[attr.lower()] = value.strip()
 
-   if found == False:
-      (rcode, value, stderr) = run_cmd('condor_config_val ' + attr, environ=environ)
-      if rcode == 0:
-         found = True
-         config[attr.lower()] = value.strip()
+      if found == False:
+         # Try the param name by itself
+         (rcode, value, stderr) = run_cmd('condor_config_val ' + attr, environ=environ)
+         if rcode == 0:
+            found = True
+            config[attr.lower()] = value.strip()
+         else:
+            # The param wasn't found so break out so that an execption can
+            # be raised
+            break
 
    if found == False:
       # Config value not found.  Raise an exception
