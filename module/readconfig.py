@@ -52,7 +52,7 @@ def read_condor_config(subsys, attr_list, environ={}, permit_param_only=True):
                # The param wasn't found so break out so that an execption can
                # be raised
                break
-         else
+         else:
             # Lookup of param by itself isn't allowed, so break so an exception
             # can be raised
             break
