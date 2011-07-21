@@ -59,7 +59,10 @@ def read_condor_config(subsys, attr_list, environ={}, permit_param_only=True):
 
    if found == False:
       # Config value not found.  Raise an exception
-      raise ConfigError('"%s" is not defined' % attr)
+      if subsys != '':
+         raise ConfigError('"%s_%s" is not defined' % (subsys, attr))
+      else:
+         raise ConfigError('"%s" is not defined' % attr)
    return config
 
 
