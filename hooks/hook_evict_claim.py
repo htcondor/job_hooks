@@ -32,7 +32,7 @@ def main(argv=None):
    log_name = os.path.basename(argv[0])
 
    try:
-      config = read_condor_config('JOB_HOOKS', ['IP', 'PORT', 'LOG'])
+      config = read_condor_config('JOB_HOOKS', ['IP', 'PORT', 'LOG'], permit_param_only = False)
    except ConfigError, error:
       try:
          print >> sys.stderr, 'Warning: %s' % error.msg

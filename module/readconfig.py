@@ -22,7 +22,7 @@ class ConfigError(Exception):
       self.msg = msg
 
 
-def read_condor_config(subsys, attr_list, environ={}):
+def read_condor_config(subsys, attr_list, environ={}, permit_param_only=True):
    """ Uses condor_config_val to look up values in condor's configuration.
        First looks for subsys_param, then for the newer subsys.param.
        Returns map(param, value)"""
@@ -42,14 +42,19 @@ def read_condor_config(subsys, attr_list, environ={}):
                config[attr.lower()] = value.strip()
 
       if found == False:
-         # Try the param name by itself
-         (rcode, value, stderr) = run_cmd('condor_config_val ' + attr, environ=environ)
-         if rcode == 0:
-            found = True
-            config[attr.lower()] = value.strip()
-         else:
-            # The param wasn't found so break out so that an execption can
-            # be raised
+         if permit_param_only == True:
+            # Try the param name by itself
+            (rcode, value, stderr) = run_cmd('condor_config_val ' + attr, environ=environ)
+            if rcode == 0:
+               found = True
+               config[attr.lower()] = value.strip()
+            else:
+               # The param wasn't found so break out so that an execption can
+               # be raised
+               break
+         else
+            # Lookup of param by itself isn't allowed, so break so an exception
+            # can be raised
             break
 
    if found == False:
