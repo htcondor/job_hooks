@@ -1,6 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?is_fedora: %define is_fedora %(/bin/sh -c "if [ -e /etc/fedora-release ];then echo '1'; fi")}
-%global rel 3
+%global rel 4
 
 Summary: Condor Job Hooks
 Name: condor-job-hooks
@@ -79,6 +79,12 @@ rm -rf %{buildroot}
 %{python_sitelib}/condorutils/workfetch.py*
 
 %changelog
+* Wed Jul 22 2011  <rrati@redhat> - 1.5-4
+- Added optional arg to read_condor_config to control lookup of param without
+  subsystem
+- Fixed error message raised from read_condor_config if a param with a
+  subsystem is not found
+
 * Wed Apr 27 2011  <rrati@redhat> - 1.5-3
 - Fixed param lookup issues in read_condor_config
 
