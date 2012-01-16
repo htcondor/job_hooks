@@ -71,7 +71,7 @@ rm -rf %{buildroot}
 %if %{building_for_el5}
 %defattr(-,root,root,-)
 %endif
-%doc LICENSE-2.0.txt INSTALL
+%doc LICENSE-2.0.txt CONFIG
 %defattr(0755,root,root,-)
 %_libexecdir/condor/hooks/hook_fetch_work.py*
 %_libexecdir/condor/hooks/hook_job_exit.py*
