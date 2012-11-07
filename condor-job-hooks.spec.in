@@ -6,7 +6,7 @@
 %global building_for_el5 0
 %endif
 
-Summary: Condor Job Hooks
+Summary: HTCondor Job Hooks
 Name: condor-job-hooks
 Version: #VERSION#
 Release: #RELEASE#%{?dist}
@@ -22,12 +22,12 @@ Requires: condor >= 7.0.2-4
 Requires: python-condorutils = %{version}-%{release}
 
 %description
-This package provides Condor job hooks that communicate with a translation
-daemon which interfaces with job delivery protocols outside of condor's
+This package provides HTCondor job hooks that communicate with a translation
+daemon which interfaces with job delivery protocols outside of HTCondor's
 native job delivery protocol.
 
 %package -n python-condorutils
-Summary: Common functions/utilities for condor job hooks
+Summary: Common functions/utilities for HTCondor job hooks
 Group: Applications/System
 BuildRequires: python-devel >= 2.3
 Requires: python >= 2.3
@@ -35,7 +35,7 @@ Obsoletes: condor-job-hooks-common
 Obsoletes: python-condor-job-hooks-common
 
 %description -n python-condorutils
-Common functions and utilities used by condor features.
+Common functions and utilities used by HTCondor features.
 
 %prep
 %setup -q
